@@ -31,7 +31,29 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-echo "==> نصب پیش‌نیازها..."
+# --- سرور ممکن است اپ‌های دیگری هم داشته باشد — قبل از هر تغییری بررسی می‌کنیم
+# که با آن‌ها تصادم نکنیم (پورت گونیکورن، فایل‌های nginx فقط با نام مخصوص خودمان) ---
+echo "==> بررسی پیش از نصب (سرویس‌های دیگر دست‌نخورده می‌مانند)..."
+if [ -f "/etc/nginx/sites-available/${SERVICE_NAME}" ] || [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]; then
+  echo "    توجه: به‌نظر می‌رسد قبلاً یک‌بار این اسکریپت اجرا شده — فایل‌های همین اپ آپدیت می‌شوند، نه اپ‌های دیگر."
+fi
+
+BIND_PORT=8000
+while ss -Htln "sport = :$BIND_PORT" 2>/dev/null | grep -q .; do
+  BIND_PORT=$((BIND_PORT + 1))
+done
+echo "    پورت داخلی آزاد برای gunicorn: 127.0.0.1:$BIND_PORT"
+
+if ss -Htln 'sport = :80' 2>/dev/null | grep -q .; then
+  if ! systemctl is-active --quiet nginx 2>/dev/null; then
+    echo "خطا: پورت 80 توسط یک سرویس دیگر (نه nginx) اشغال شده — برای اینکه اپ دیگری روی این سرور خراب نشود، متوقف شدم." >&2
+    echo "      خروجی 'ss -tlnp | grep :80' را بررسی کن." >&2
+    exit 1
+  fi
+  echo "    nginx از قبل روی پورت 80 هست — فقط یک server block جدید برای $DOMAIN اضافه می‌کنیم، سایت‌های دیگرش دست‌نخورده می‌مانند."
+fi
+
+echo "==> نصب پیش‌نیازها (سرویس‌های موجود را دست نمی‌زند)..."
 apt update -y
 apt install -y python3-venv python3-pip nginx git
 
@@ -55,7 +77,7 @@ SECRET_KEY=$SECRET_KEY
 DATABASE_URL=sqlite:///$APP_DIR/tmdt.db
 BEHIND_PROXY=1
 SESSION_COOKIE_SECURE=0
-BIND=127.0.0.1:8000
+BIND=127.0.0.1:$BIND_PORT
 WEB_CONCURRENCY=2
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
@@ -111,7 +133,7 @@ server {
         return 403;
     }
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:$BIND_PORT;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
