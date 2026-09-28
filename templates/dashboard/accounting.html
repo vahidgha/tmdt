@@ -21,6 +21,10 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       سند واریز
     </button>
+    <button class="btn btn-ghost" onclick="openBankImport()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      وارد کردن صورت‌حساب بانکی
+    </button>
   </div>
 </div>
 
@@ -34,6 +38,7 @@
   <button class="tab" data-pane="expenses">هزینه‌ها</button>
   <button class="tab" data-pane="accounts">مانده حساب‌ها</button>
   <button class="tab" data-pane="projects">تفکیک پروژه</button>
+  <button class="tab" data-pane="orgunits">تفکیک واحد سازمانی</button>
   <button class="tab" data-pane="debtors">بدهکاران</button>
 </div>
 
@@ -48,6 +53,9 @@
       </select>
       <input class="input" id="fFrom" placeholder="از 1404/01/01" style="max-width:140px" onchange="goPage(1)">
       <input class="input" id="fTo" placeholder="تا" style="max-width:120px" onchange="goPage(1)">
+      <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;white-space:nowrap">
+        <input type="checkbox" id="fUnmatched" onchange="goPage(1)"> فقط بدون تطبیق (وارداتی بانک)
+      </label>
     </div>
     <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;align-items:center">
       <span id="totalsBar"></span>
@@ -100,6 +108,14 @@
   </table></div></div>
 </div>
 
+<!-- تب تفکیک واحد سازمانی — میزان مشارکت هر واحد/استان در واریزی‌ها -->
+<div id="pane-orgunits" class="tab-pane">
+  <div class="card"><div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>واحد سازمانی</th><th>تعداد عضو واریزکننده</th><th>تعداد سند</th><th>جمع واریزی (ریال)</th><th>سهم از کل</th></tr></thead>
+    <tbody id="orgUnitTbody"></tbody>
+  </table></div></div>
+</div>
+
 <!-- تب بدهکاران — پیگیری بدهکار/بستانکار هر عضو -->
 <div id="pane-debtors" class="tab-pane">
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
@@ -133,6 +149,23 @@
     <div class="field"><label>فیش واریز (اختیاری)</label><input type="file" class="input" id="vReceipt" accept="image/*,.pdf"></div>
   </div>
   <div class="modal-foot"><button class="btn btn-gold" onclick="submitVoucher(this)">ثبت سند</button><button class="btn btn-ghost" onclick="modal.close('voucherModal')">انصراف</button></div>
+</div></div>
+
+<!-- Modal: وارد کردن صورت‌حساب بانکی -->
+<div class="modal" id="bankImportModal"><div class="modal-box" style="max-width:520px">
+  <div class="modal-head"><span class="modal-title">وارد کردن صورت‌حساب بانکی</span><button class="modal-x" onclick="modal.close('bankImportModal')">×</button></div>
+  <div class="modal-body">
+    <div id="biErr" class="alert alert-bad" style="display:none"></div>
+    <div id="biResult" class="alert alert-ok" style="display:none"></div>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+      فایل اکسل خروجی مستقیم صورت‌حساب بانک را انتخاب کنید. هر ردیف واریزی با «شناسه واریز»
+      درون توضیحات تراکنش به عضو مربوطه تطبیق داده می‌شود؛ ردیف‌های بدون تطبیق هم ثبت
+      می‌شوند تا بعداً از فهرست «فقط بدون تطبیق» اصلاح شوند.
+    </p>
+    <div class="field"><label>حساب مقصد *</label><select class="input" id="biAccount"></select></div>
+    <div class="field"><label>فایل صورت‌حساب (xlsx) *</label><input type="file" class="input" id="biFile" accept=".xlsx,.xls"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-gold" onclick="submitBankImport(this)">وارد کردن</button><button class="btn btn-ghost" onclick="modal.close('bankImportModal')">انصراف</button></div>
 </div></div>
 
 <!-- Modal: سند هزینه -->
@@ -233,7 +266,7 @@ function receiptBtn(path, label){
   return '<a class="btn-outline btn-sm" href="/uploads/'+path+'" target="_blank">فیش</a> ';
 }
 
-function initTabs(){document.querySelectorAll('.tabs').forEach(function(tabs){tabs.querySelectorAll('.tab').forEach(function(btn){btn.addEventListener('click',function(){var pane=btn.dataset.pane;tabs.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b===btn);});document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.toggle('active',p.id==='pane-'+pane);});if(pane==='expenses')loadExpenses();if(pane==='accounts')loadBalances();if(pane==='projects')loadProjectsSummary();if(pane==='debtors')loadDebtors();});});});}
+function initTabs(){document.querySelectorAll('.tabs').forEach(function(tabs){tabs.querySelectorAll('.tab').forEach(function(btn){btn.addEventListener('click',function(){var pane=btn.dataset.pane;tabs.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b===btn);});document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.toggle('active',p.id==='pane-'+pane);});if(pane==='expenses')loadExpenses();if(pane==='accounts')loadBalances();if(pane==='projects')loadProjectsSummary();if(pane==='orgunits')loadOrgUnitsSummary();if(pane==='debtors')loadDebtors();});});});}
 
 function loadDashboard(){
   fetch('/api/accounting/dashboard').then(function(r){return r.ok?r.json():null;}).then(function(d){
@@ -262,6 +295,7 @@ function loadAccounts(){
     document.getElementById('fAccount').innerHTML='<option value="">همه حساب‌ها</option>'+accounts.map(function(a){return '<option value="'+a.id+'">'+esc(a.holder_name)+'</option>';}).join('');
     document.getElementById('vAccount').innerHTML=actOpts;
     document.getElementById('eAccount').innerHTML=actOpts;
+    document.getElementById('biAccount').innerHTML=actOpts;
     renderAccountsList();
   });
 }
@@ -280,6 +314,36 @@ function addAccount(btn){var h=document.getElementById('aHolder').value.trim();i
 function $v(id){return document.getElementById(id).value.trim();}
 function openAccounts(){modal.open('accountsModal');}
 
+function openBankImport(){
+  if(!accounts.filter(function(a){return a.active;}).length){toast('اول یک حساب تعریف کنید','warn');openAccounts();return;}
+  document.getElementById('biFile').value='';
+  document.getElementById('biErr').style.display='none';
+  document.getElementById('biResult').style.display='none';
+  modal.open('bankImportModal');
+}
+function submitBankImport(btn){
+  var err=document.getElementById('biErr'), res=document.getElementById('biResult');
+  err.style.display='none'; res.style.display='none';
+  var accId=document.getElementById('biAccount').value;
+  var file=document.getElementById('biFile').files[0];
+  if(!accId){err.textContent='حساب مقصد را انتخاب کنید.';err.style.display='';return;}
+  if(!file){err.textContent='فایل صورت‌حساب را انتخاب کنید.';err.style.display='';return;}
+  var fd=new FormData();fd.append('account_id',accId);fd.append('file',file);
+  btnLoading(btn,true);
+  fetch('/api/accounting/vouchers/import-bank-statement',{method:'POST',body:fd})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){
+      btnLoading(btn,false);
+      if(!x.ok){err.textContent=x.d.error||'خطا در وارد کردن فایل';err.style.display='';return;}
+      res.innerHTML='<b>'+x.d.matched+'</b> واریزی تطبیق‌یافته، <b>'+x.d.unmatched+'</b> بدون تطبیق، '+
+        x.d.skipped_duplicate+' تکراری نادیده‌گرفته‌شد.';
+      res.style.display='';
+      toast('صورت‌حساب وارد شد');
+      loadVouchers();loadDashboard();
+    })
+    .catch(function(){btnLoading(btn,false);err.textContent='خطا در اتصال به سرور';err.style.display='';});
+}
+
 function loadMembers(){fetch('/api/members').then(function(r){return r.json();}).then(function(d){
   var opts=(d.members||[]).map(function(m){return '<option value="'+m.id+'">'+esc(m.full_name)+(m.national_code?' — '+esc(m.national_code):'')+'</option>';}).join('');
   document.getElementById('vUser').innerHTML='<option value="">— عضو نیست / نام آزاد —</option>'+opts;
@@ -296,7 +360,7 @@ function openNewVoucher(){if(!accounts.filter(function(a){return a.active;}).len
 function submitVoucher(btn){var err=document.getElementById('vErr');err.style.display='none';var fd=new FormData();fd.append('account_id',$v('vAccount'));fd.append('amount',rawAmt('vAmount'));fd.append('deposit_date',$v('vDate'));fd.append('deposit_time',$v('vTime'));fd.append('method',$v('vMethod'));fd.append('reference_no',$v('vRef'));fd.append('description',$v('vDesc'));var uid=$v('vUser');if(uid)fd.append('user_id',uid);else fd.append('payer_name',$v('vPayer'));var f=document.getElementById('vReceipt').files[0];if(f)fd.append('receipt',f);btnLoading(btn,true);
   fetch('/api/accounting/vouchers',{method:'POST',body:fd}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){modal.close('voucherModal');toast('سند #'+x.d.voucher.number+' ثبت شد');loadVouchers();loadDashboard();}else{err.textContent=x.d.error||'خطا';err.style.display='';}}).catch(function(){btnLoading(btn,false);err.textContent='خطا در سرور';err.style.display='';});}
 
-function loadVouchers(){var p=new URLSearchParams({page:curPage,per_page:30});var s=$v('fSearch');if(s)p.set('search',s);var a=$v('fAccount');if(a)p.set('account_id',a);var st=$v('fStatus');if(st)p.set('status',st);var df=$v('fFrom');if(df)p.set('date_from',df);var dt=$v('fTo');if(dt)p.set('date_to',dt);
+function loadVouchers(){var p=new URLSearchParams({page:curPage,per_page:30});var s=$v('fSearch');if(s)p.set('search',s);var a=$v('fAccount');if(a)p.set('account_id',a);var st=$v('fStatus');if(st)p.set('status',st);var df=$v('fFrom');if(df)p.set('date_from',df);var dt=$v('fTo');if(dt)p.set('date_to',dt);if(document.getElementById('fUnmatched').checked)p.set('unmatched','1');
   document.getElementById('vTbody').innerHTML=skeletonRows(9);
   fetch('/api/accounting/vouchers?'+p).then(function(r){return r.json();}).then(function(d){
     document.getElementById('totalsBar').innerHTML='<b>'+d.total+'</b> سند — جمع فعال: <b style="color:var(--navy)">'+fmt(d.total_amount)+' ریال</b>';
@@ -304,7 +368,7 @@ function loadVouchers(){var p=new URLSearchParams({page:curPage,per_page:30});va
     if(!d.vouchers.length){tb.innerHTML='<tr><td colspan="9"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>سندی یافت نشد</div></td></tr>';}
     else tb.innerHTML=d.vouchers.map(function(v){var voided=v.status==='voided';
       return '<tr style="'+(voided?'opacity:.5':'')+'">'+
-        '<td class="mono"><b>#'+v.number+'</b></td><td>'+esc(v.payer_name)+'</td>'+
+        '<td class="mono"><b>#'+v.number+'</b></td><td>'+esc(v.payer_name)+(v.source==='bank_import'&&!v.matched?' <span class="badge b-warn" title="از صورت‌حساب بانکی وارد شده و به هیچ عضوی تطبیق نیافته">بدون تطبیق</span>':'')+'</td>'+
         '<td style="font-size:12px">'+v.account_label+'</td><td class="mono"><b>'+fmt(v.amount)+'</b></td>'+
         '<td>'+(v.user_id&&!voided?'<button class="btn-outline btn-sm" onclick="openAlloc('+v.id+')">تخصیص</button>':'—')+'</td>'+
         '<td class="mono" style="font-size:12px">'+v.deposit_date+(v.deposit_time?' — '+v.deposit_time:'')+'</td>'+
@@ -360,7 +424,9 @@ function loadBalances(){fetch('/api/accounting/summary').then(function(r){return
     return '<div class="card card-p" style="'+(a.active?'':'opacity:.55')+'"><div style="font-weight:800">'+esc(a.holder_name)+(a.holder_role?' <small style="color:var(--muted);font-weight:400">('+esc(a.holder_role)+')</small>':'')+'</div>'+
       '<div style="margin-top:8px;font-size:12px;display:flex;justify-content:space-between"><span style="color:var(--muted)">واریزی</span><b style="color:var(--ok)">'+fmt(s.deposits)+'</b></div>'+
       '<div style="font-size:12px;display:flex;justify-content:space-between"><span style="color:var(--muted)">هزینه</span><b style="color:var(--bad)">'+fmt(s.expenses)+'</b></div>'+
-      '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:14px;display:flex;justify-content:space-between"><b>موجودی</b><b style="color:var(--navy)">'+fmt(s.balance)+'</b></div></div>';
+      '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:14px;display:flex;justify-content:space-between"><b>موجودی</b><b style="color:var(--navy)">'+fmt(s.balance)+'</b></div>'+
+      (s.bank_reported_balance!=null?'<div style="margin-top:4px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between"><span>مانده اعلامی بانک ('+esc(s.bank_reported_at||'')+')</span><span>'+fmt(s.bank_reported_balance)+'</span></div>':'')+
+      '</div>';
   }).join('')||'<div class="empty" style="grid-column:1/-1"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>حسابی تعریف نشده</div>';});}
 function loadProjectsSummary(){fetch('/api/accounting/projects-summary').then(function(r){return r.json();}).then(function(d){
   document.getElementById('projTbody').innerHTML=(d.projects||[]).map(function(p){
@@ -368,6 +434,14 @@ function loadProjectsSummary(){fetch('/api/accounting/projects-summary').then(fu
       '<td class="mono" style="color:var(--bad)">'+fmt(p.remaining)+'</td><td class="mono">'+fmt(p.expenses)+'</td>'+
       '<td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:'+Math.min(100,p.collection_rate)+'%;height:100%;background:var(--ok)"></div></div><span style="font-size:12px">'+p.collection_rate+'٪</span></div></td></tr>';
   }).join('')||'<tr><td colspan="6"><div class="empty" style="padding:20px">پروژه‌ای نیست</div></td></tr>';});}
+function loadOrgUnitsSummary(){fetch('/api/accounting/org-units-summary').then(function(r){return r.json();}).then(function(d){
+  var grand=d.grand_total||0;
+  document.getElementById('orgUnitTbody').innerHTML=(d.org_units||[]).map(function(o){
+    var pct=grand?Math.round(o.total_amount/grand*1000)/10:0;
+    return '<tr><td><b>'+esc(o.org_unit)+'</b></td><td class="mono">'+o.member_count+'</td><td class="mono">'+o.voucher_count+'</td>'+
+      '<td class="mono" style="color:var(--ok)">'+fmt(o.total_amount)+'</td>'+
+      '<td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:'+Math.min(100,pct)+'%;height:100%;background:var(--navy)"></div></div><span style="font-size:12px">'+pct+'٪</span></div></td></tr>';
+  }).join('')||'<tr><td colspan="5"><div class="empty" style="padding:20px">واریزی تطبیق‌یافته‌ای ثبت نشده</div></td></tr>';});}
 
 /* ── بدهکاران ── */
 var allDebtors=[];

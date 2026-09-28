@@ -22,6 +22,9 @@ _USER_FIELD_LIMITS = [
     ("bank_name",       60,  "نام بانک"),
     ("account_number",  30,  "شماره حساب"),
     ("iban",            30,  "شماره شبا"),
+    ("personnel_code",  20,  "کدپرسنلی"),
+    ("deposit_id",      30,  "شناسه واریز"),
+    ("org_unit",        80,  "واحد سازمانی"),
 ]
 
 _PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
@@ -40,7 +43,8 @@ def validate_user_fields(data: dict) -> str | None:
     """
     # نرمال‌سازی ارقام فارسی در فیلدهای عددی
     for f in ("national_code", "phone", "emergency_phone", "landline",
-              "postal_code", "id_number", "account_number", "iban"):
+              "postal_code", "id_number", "account_number", "iban",
+              "personnel_code", "deposit_id"):
         if data.get(f):
             data[f] = normalize_digits(str(data[f]).strip())
 

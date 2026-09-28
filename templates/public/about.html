@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _title = settings.get('site_title','سامانه مدیریت اعضا و امور مالی') %}
   {% set _desc  = (settings.get('about_text') or '').strip()[:160] or ('درباره ' ~ _title) %}
   {% set _url   = request.url_root.rstrip('/') + '/about' %}
   {% set _logo_url = (request.url_root.rstrip('/') ~ '/uploads/' ~ settings.site_logo) if settings.get('site_logo') else '' %}
@@ -125,7 +125,7 @@
           </svg>
           {% endif %}
         </div>
-        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+        <span class="pub-nav-name">{{ settings.get('site_title','سامانه مدیریت اعضا و امور مالی') }}</span>
       </a>
       <div class="pub-nav-links">
         <a href="/marketplace" class="pub-nav-link">بازار خرید و فروش</a>
@@ -145,7 +145,7 @@
 <section class="about-hero">
   <div class="about-hero-inner">
     <div class="sec-kicker reveal in">🏢 درباره ما</div>
-    <h1 class="reveal in">آشنایی با <span>{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span></h1>
+    <h1 class="reveal in">آشنایی با <span>{{ settings.get('site_title','سامانه مدیریت اعضا و امور مالی') }}</span></h1>
   </div>
 </section>
 

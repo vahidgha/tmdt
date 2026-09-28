@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _title = settings.get('site_title','سامانه مدیریت اعضا و امور مالی') %}
   {% set _desc  = settings.get('site_subtitle') or 'سامانه آنلاین ' ~ _title ~ ' — مدیریت دفترچه مالکیت، پروژه‌های ساختمانی، اطلاعیه‌ها و خدمات اعضا.' %}
   {% set _url   = request.url_root.rstrip('/') + '/' %}
   {% set _logo_url = (_url ~ 'uploads/' ~ settings.site_logo) if settings.get('site_logo') else '' %}
@@ -78,7 +78,7 @@
           </svg>
           {% endif %}
         </div>
-        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+        <span class="pub-nav-name">{{ settings.get('site_title','سامانه مدیریت اعضا و امور مالی') }}</span>
       </div>
       <div class="pub-nav-links">
         <a href="/marketplace" class="pub-nav-link">بازار خرید و فروش</a>
@@ -153,7 +153,7 @@
   <!-- بدون اسلاید — Hero ساده -->
   <div class="hero-content">
     <div class="hero-main">
-      <h1 class="hero-h1" id="heroTitle" data-text="{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</h1>
+      <h1 class="hero-h1" id="heroTitle" data-text="{{ settings.get('site_title','سامانه مدیریت اعضا و امور مالی') }}">{{ settings.get('site_title','سامانه مدیریت اعضا و امور مالی') }}</h1>
       <p class="hero-p" id="heroSub">{{ settings.get('site_subtitle','سامانه آنلاین مدیریت دفترچه مالکیت') }}</p>
       <div class="hero-actions" id="heroActions">
         <a href="/login" class="hero-btn-solid">ورود اعضا</a>
@@ -453,8 +453,6 @@
     <div class="footer-copy">
       تمامی حقوق مادی و معنوی این سامانه محفوظ و متعلق به <a href="https://Noyan.team" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline"><strong>نویان فناور آریا</strong></a> است.
       <span style="opacity:.6;font-size:11px;margin-right:8px">نسخه {{ app_version }}</span>
-      این سامانه به سفارش و به افتخار مدیرعامل تعاونی مسکن دادگستری کل استان زنجان،
-      جناب آقای <strong>علی غفاری</strong>، طراحی و تقدیم گردیده است.
     </div>
   </div>
 </footer>

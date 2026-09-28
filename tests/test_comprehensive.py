@@ -1115,7 +1115,7 @@ class TestPublicSite:
 
     def test_index_html_content(self, app):
         body = app.test_client().get("/").data.decode("utf-8")
-        assert "تعاونی" in body or "مسکن" in body or "دادگستری" in body
+        assert "سامانه" in body or "اعضا" in body
 
     def test_index_has_html_structure(self, app):
         body = app.test_client().get("/").data.decode("utf-8")

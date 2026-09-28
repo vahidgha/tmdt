@@ -277,9 +277,9 @@ def create_app():
             return e
         try:
             row = db_session.get(SiteSetting, 'site_title')
-            site_title = row.value if row else 'هیئت امنای مسکن دادگستری زنجان'
+            site_title = row.value if row else 'سامانه مدیریت اعضا و امور مالی'
         except Exception:
-            site_title = 'هیئت امنای مسکن دادگستری زنجان'
+            site_title = 'سامانه مدیریت اعضا و امور مالی'
         return render_template('public/404.html', site_title=site_title), 404
 
     # ── لاگ‌گیری خطاها روی فایل + اطلاع خطای ۵۰۰ به ادمین‌های بله ──────────────
@@ -367,6 +367,14 @@ def _migrate(engine):
         _add('users',    'birth_date',       'VARCHAR(20)')
         _add('users',    'emergency_phone',  'VARCHAR(15)')
         _add('users',    'profile_complete', 'BOOLEAN DEFAULT TRUE')
+        _add('users',    'personnel_code',   'VARCHAR(20)')
+        _add('users',    'deposit_id',       'VARCHAR(30)')
+        _add('users',    'org_unit',         'VARCHAR(80)')
+        _add('deposit_vouchers', 'source',             "VARCHAR(20) DEFAULT 'manual'")
+        _add('deposit_vouchers', 'branch_code',        "VARCHAR(20) DEFAULT ''")
+        _add('deposit_vouchers', 'branch_name',        "VARCHAR(80) DEFAULT ''")
+        _add('deposit_vouchers', 'channel',            "VARCHAR(20) DEFAULT ''")
+        _add('deposit_vouchers', 'bank_balance_after', 'BIGINT')
         _add('booklets', 'serial',           'INTEGER')
         _add('booklets', 'booklet_number',   "VARCHAR(30) DEFAULT ''")
         _add('booklets', 'contract_no',      "VARCHAR(80) DEFAULT ''")
@@ -525,14 +533,14 @@ def _seed(sess):
         except IntegrityError:
             sess.rollback()
     defaults = [
-        ('site_title',    'تعاونی مسکن دادگستری کل استان زنجان'),
-        ('site_subtitle', 'سامانه آنلاین مدیریت دفترچه مالکیت'),
-        ('site_phone',    ''),
-        ('site_address',  ''),
+        ('site_title',    os.environ.get('SITE_TITLE',    'سامانه مدیریت اعضا و امور مالی')),
+        ('site_subtitle', os.environ.get('SITE_SUBTITLE', 'سامانه آنلاین مدیریت اعضا و واریزی‌ها')),
+        ('site_phone',    os.environ.get('SITE_PHONE',    '')),
+        ('site_address',  os.environ.get('SITE_ADDRESS',  '')),
         ('hero_btn_label','ورود اعضا'),
-        ('exec_manager',  'علی غفاری'),
-        ('board_rep',     'خلیل باقری'),
-        ('board_title',   'هیئت رئیسه امنای مسکن دادگستری استان زنجان'),
+        ('exec_manager',  os.environ.get('EXEC_MANAGER',  '')),
+        ('board_rep',     os.environ.get('BOARD_REP',     '')),
+        ('board_title',   os.environ.get('BOARD_TITLE',   'هیئت مدیره')),
         ('bale_bot_username', ''),
         ('bale_bot_token',    ''),
         ('sms_api_key',       ''),

@@ -1,4 +1,4 @@
-/* Service Worker — هیئت امنای مسکن دادگستری زنجان */
+/* Service Worker — سامانه مدیریت اعضا و امور مالی */
 const CACHE = 'noyan-v2';
 const STATIC = [
   '/static/css/main.css',

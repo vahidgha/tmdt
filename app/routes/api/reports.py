@@ -142,7 +142,8 @@ def _members_export_rows():
     if name:
         members = [m for m in members if name in m.full_name]
 
-    headers = ["نام", "نام خانوادگی", "کد ملی", "جنسیت", "موبایل", "دفترچه‌ها", "بدهی (ریال)"]
+    headers = ["نام", "نام خانوادگی", "کد ملی", "کدپرسنلی", "واحد سازمانی",
+               "جنسیت", "موبایل", "دفترچه‌ها", "بدهی (ریال)"]
     rows = []
     for m in members:
         debt = sum(p.amount for p in m.payments if p.status in ("unpaid", "overdue"))
@@ -150,6 +151,7 @@ def _members_export_rows():
             f"{(b.booklet_number or b.code)} ({b.project.name if b.project else ''})" for b in m.booklets
         ) or "—"
         rows.append([m.first_name or "", m.last_name or "", m.national_code or "—",
+                     m.personnel_code or "—", m.org_unit or "—",
                      m.gender or "—", m.phone or "—", booklets, debt])
 
     proj_name = None

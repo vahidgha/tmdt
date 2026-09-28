@@ -17,7 +17,7 @@
 
 <div class="card">
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input class="input" id="search" placeholder="جستجو نام، کد ملی، موبایل…" oninput="searchChanged()" style="flex:1;min-width:180px">
+    <input class="input" id="search" placeholder="جستجو نام، کد ملی، کدپرسنلی، موبایل…" oninput="searchChanged()" style="flex:1;min-width:180px">
     <select class="input" id="projectFilter" onchange="goPage(1)" style="max-width:220px;flex:1">
       <option value="">همه پروژه‌ها</option>
     </select>
@@ -26,7 +26,7 @@
   <div class="tbl-wrap">
     <table class="tbl" id="tbl">
       <thead><tr>
-        <th>نام</th><th>نام خانوادگی</th><th>کد ملی</th><th>جنسیت</th><th>موبایل</th>
+        <th>نام</th><th>نام خانوادگی</th><th>کد ملی</th><th>کدپرسنلی</th><th>واحد سازمانی</th><th>جنسیت</th><th>موبایل</th>
         <th>دفترچه‌ها</th><th>وضعیت</th><th>عملیات</th>
       </tr></thead>
       <tbody id="tbody"></tbody>
@@ -61,6 +61,9 @@
           <select class="input" id="mGender"><option value="">— انتخاب —</option><option value="مرد">مرد</option><option value="زن">زن</option></select>
         </div>
         <div class="field"><label>کد ملی *</label><input class="input mono" id="mNat" maxlength="10"></div>
+        <div class="field"><label>کدپرسنلی</label><input class="input mono" id="mPersonnel"></div>
+        <div class="field"><label>شناسه واریز</label><input class="input mono" id="mDepositId"></div>
+        <div class="field"><label>واحد سازمانی</label><input class="input" id="mOrgUnit"></div>
         <div class="field"><label>شماره شناسنامه</label><input class="input mono" id="mIdNum"></div>
         <div class="field"><label>نام پدر</label><input class="input" id="mFather"></div>
         <div class="field"><label>تاریخ تولد</label><input class="input" id="mBirth" placeholder="۱۳۶۰/۰۱/۰۱" data-jdp></div>
@@ -213,6 +216,9 @@
         <div class="field"><label>نام خانوادگی *</label><input class="input" id="eLn"></div>
         <div class="field"><label>جنسیت</label><select class="input" id="eGender"><option value="">— انتخاب —</option><option value="مرد">مرد</option><option value="زن">زن</option></select></div>
         <div class="field"><label>کد ملی</label><input class="input mono" id="eNat" maxlength="10"></div>
+        <div class="field"><label>کدپرسنلی</label><input class="input mono" id="ePersonnel"></div>
+        <div class="field"><label>شناسه واریز</label><input class="input mono" id="eDepositId"></div>
+        <div class="field"><label>واحد سازمانی</label><input class="input" id="eOrgUnit"></div>
         <div class="field"><label>شماره شناسنامه</label><input class="input mono" id="eIdNum"></div>
         <div class="field"><label>نام پدر</label><input class="input" id="eFather"></div>
         <div class="field"><label>تاریخ تولد</label><input class="input" id="eBirth" placeholder="۱۳۶۰/۰۱/۰۱" data-jdp></div>
@@ -323,7 +329,7 @@ function load() {
     renderPager(d);
     var tb = document.getElementById('tbody');
     if (!d.members.length) {
-      tb.innerHTML = '<tr><td colspan="8"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>عضوی یافت نشد</div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="10"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>عضوی یافت نشد</div></td></tr>';
       return;
     }
     tb.innerHTML = d.members.map(function(m) {
@@ -339,6 +345,8 @@ function load() {
         '<td>' + esc(m.first_name) + '</td>' +
         '<td><b>' + esc(m.last_name) + '</b></td>' +
         '<td class="mono">' + esc(m.national_code||'—') + '</td>' +
+        '<td class="mono">' + esc(m.personnel_code||'—') + '</td>' +
+        '<td>' + esc(m.org_unit||'—') + '</td>' +
         '<td>' + esc(m.gender||'—') + '</td>' +
         '<td>' + esc(m.phone||'—') + '</td>' +
         '<td>' + booklets +
@@ -358,6 +366,7 @@ function load() {
 }
 var editUid = null;
 var EDIT_MAP = {eFn:'first_name',eLn:'last_name',eGender:'gender',eNat:'national_code',
+  ePersonnel:'personnel_code',eDepositId:'deposit_id',eOrgUnit:'org_unit',
   eIdNum:'id_number',eFather:'father_name',eBirth:'birth_date',ePhone:'phone',
   eEmergency:'emergency_phone',eLandline:'landline',eAddr:'address',ePostal:'postal_code',
   eOccupation:'occupation',eEmail:'email',eUser:'username',eBank:'bank_name',
@@ -477,6 +486,9 @@ function addMember(btn) {
     last_name:  document.getElementById('mLn').value.trim(),
     gender: document.getElementById('mGender').value,
     national_code: document.getElementById('mNat').value.trim(),
+    personnel_code: document.getElementById('mPersonnel').value.trim(),
+    deposit_id: document.getElementById('mDepositId').value.trim(),
+    org_unit: document.getElementById('mOrgUnit').value.trim(),
     id_number: document.getElementById('mIdNum').value.trim(),
     father_name: document.getElementById('mFather').value.trim(),
     birth_date: document.getElementById('mBirth').value.trim(),

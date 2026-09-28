@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _title = settings.get('site_title','سامانه مدیریت اعضا و امور مالی') %}
   {% set _desc  = (listing.description or '')[:150] or (listing.title ~ ' — ' ~ "{:,}".format(listing.price) ~ ' تومان') %}
   {% set _url   = request.url_root.rstrip('/') + '/marketplace/' + listing.slug %}
   <title>{{ listing.title }} — بازار خرید و فروش دفترچه‌ها | {{ _title }}</title>
@@ -135,7 +135,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
           {% endif %}
         </div>
-        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+        <span class="pub-nav-name">{{ settings.get('site_title','سامانه مدیریت اعضا و امور مالی') }}</span>
       </a>
       <div class="pub-nav-links">
         <a href="/marketplace" class="pub-nav-link" style="color:var(--p-gold)">بازار خرید و فروش</a>

@@ -71,7 +71,7 @@ function load(){
       '<div class="ct-header">'+
         '<div class="ct-logo-block">'+
           '<div class="ct-logo"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>'+
-          '<div class="ct-org">'+esc(s.site_title||'هیئت امنای مسکن دادگستری زنجان')+'</div>'+
+          '<div class="ct-org">'+esc(s.site_title||'سامانه مدیریت اعضا و امور مالی')+'</div>'+
         '</div>'+
         '<div class="ct-title">قرارداد دفترچه مالکیت</div>'+
         '<div class="ct-code">'+
@@ -82,13 +82,13 @@ function load(){
         '</div>'+
       '</div>'+
       '<div class="ct-section"><div class="ct-section-title">موضوع</div>'+
-        '<div class="ct-clause">این قرارداد بین هیئت امنای مسکن دادگستری استان زنجان به عنوان طرف اول و شخص با مشخصات زیر به عنوان طرف دوم در خصوص واگذاری یک واحد '+shareLabel+' از پروژه «'+esc(p.name)+'» منعقد می‌گردد.</div>'+
+        '<div class="ct-clause">این قرارداد بین '+esc(s.site_title||'سامانه مدیریت اعضا و امور مالی')+' به عنوان طرف اول و شخص با مشخصات زیر به عنوان طرف دوم در خصوص واگذاری یک واحد '+shareLabel+' از پروژه «'+esc(p.name)+'» منعقد می‌گردد.</div>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">'+
         '<div class="ct-section"><div class="ct-section-title">طرف اول (هیئت امنا)</div>'+
-          row('مدیر اجرایی', s.exec_manager||'علی غفاری')+
-          row('نماینده هیئت', s.board_rep||'خلیل باقری')+
-          row('سمت', s.board_title||'هیئت رئیسه امنای مسکن')+
+          row('مدیر اجرایی', s.exec_manager||'—')+
+          row('نماینده هیئت', s.board_rep||'—')+
+          row('سمت', s.board_title||'هیئت مدیره')+
         '</div>'+
         '<div class="ct-section"><div class="ct-section-title">طرف دوم (خریدار)</div>'+
           row('نام و نام خانوادگی', u.first_name+' '+u.last_name)+
@@ -106,8 +106,8 @@ function load(){
         '<div class="ct-clause">۴. این قرارداد در دو نسخه تنظیم و هر دو نسخه دارای اعتبار یکسان است.</div>'+
       '</div>'+
       '<div class="ct-sigs">'+
-        '<div class="ct-sig-box"><div class="ct-stamp">مهر</div><div class="ct-sig-name">'+esc(s.exec_manager||'علی غفاری')+'</div><div>مدیر اجرایی</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
-        '<div class="ct-sig-box"><div class="ct-stamp">مهر</div><div class="ct-sig-name">'+esc(s.board_rep||'خلیل باقری')+'</div><div>'+esc(s.board_title||'هیئت رئیسه')+'</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
+        '<div class="ct-sig-box"><div class="ct-stamp">مهر</div><div class="ct-sig-name">'+esc(s.exec_manager||'—')+'</div><div>مدیر اجرایی</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
+        '<div class="ct-sig-box"><div class="ct-stamp">مهر</div><div class="ct-sig-name">'+esc(s.board_rep||'—')+'</div><div>'+esc(s.board_title||'هیئت مدیره')+'</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
         '<div class="ct-sig-box"><div class="ct-stamp">اثر انگشت</div><div class="ct-sig-name">'+esc(u.first_name)+' '+esc(u.last_name)+'</div><div>طرف دوم قرارداد</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
       '</div>'+
       '</div>';

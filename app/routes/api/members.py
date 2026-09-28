@@ -62,6 +62,8 @@ def members_list():
             User.national_code.ilike(like),
             User.phone.ilike(like),
             User.username.ilike(like),
+            User.personnel_code.ilike(like),
+            User.deposit_id.ilike(like),
         ))
 
     q     = q.order_by(User.last_name, User.first_name)
@@ -109,6 +111,10 @@ def members_create():
     if nat and db_session.query(User).filter_by(national_code=nat).first():
         return jsonify(error="عضوی با این کد ملی قبلاً ثبت شده."), 409
 
+    dep_id = (data.get("deposit_id") or "").strip()
+    if dep_id and db_session.query(User).filter_by(deposit_id=dep_id).first():
+        return jsonify(error="عضوی با این شناسه واریز قبلاً ثبت شده."), 409
+
     user = User(
         username=data["username"],
         password_hash=generate_password_hash(data["password"]),
@@ -125,6 +131,9 @@ def members_create():
         landline=data.get("landline"),
         address=data.get("address"),
         postal_code=data.get("postal_code"),
+        personnel_code=data.get("personnel_code"),
+        deposit_id=data.get("deposit_id"),
+        org_unit=data.get("org_unit"),
         active=True,
         profile_complete=True,
     )
@@ -147,6 +156,7 @@ _EDITABLE_MEMBER_FIELDS = [
     "phone", "emergency_phone", "father_name", "birth_date", "birth_place",
     "marital_status", "landline", "address", "postal_code", "occupation",
     "email", "bank_name", "account_number", "iban",
+    "personnel_code", "deposit_id", "org_unit",
 ]
 
 
@@ -188,6 +198,12 @@ def member_update(uid):
         dup = db_session.query(User).filter(User.national_code == new_nat, User.id != uid).first()
         if dup:
             return jsonify(error="عضو دیگری با این کد ملی وجود دارد."), 409
+
+    new_dep = check.get("deposit_id")
+    if new_dep and new_dep != (u.deposit_id or ""):
+        dup = db_session.query(User).filter(User.deposit_id == new_dep, User.id != uid).first()
+        if dup:
+            return jsonify(error="عضو دیگری با این شناسه واریز وجود دارد."), 409
 
     for f in _EDITABLE_MEMBER_FIELDS:
         if f in data:
@@ -556,6 +572,9 @@ def _excel_column_definitions():
         ("نام کاربری *",     "username",        20, True),
         ("رمز عبور *",       "password",        16, True),
         ("کد ملی",           "national_code",   14, False),
+        ("کدپرسنلی",         "personnel_code",  16, False),
+        ("شناسه واریز",      "deposit_id",      20, False),
+        ("واحد سازمانی",     "org_unit",        20, False),
         ("جنسیت",            "gender",          10, False),
         ("شماره شناسنامه",   "id_number",       16, False),
         ("موبایل",           "phone",           14, False),
@@ -591,8 +610,12 @@ def _build_excel_header(ws, cols):
     thin = Side(style="thin", color="C8A456")
     bdr  = Border(left=thin, right=thin, top=thin, bottom=thin)
 
+    from ...models import SiteSetting
+    site_row = db_session.get(SiteSetting, "site_title")
+    site_title = site_row.value if site_row else "سامانه مدیریت اعضا و امور مالی"
+
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(cols))
-    c = ws.cell(row=1, column=1, value="هیئت امنای مسکن دادگستری زنجان — فرم ورود اطلاعات اعضا")
+    c = ws.cell(row=1, column=1, value=f"{site_title} — فرم ورود اطلاعات اعضا")
     c.font = Font(bold=True, color="C8A456", size=13, name="Calibri")
     c.fill = NAVY
     c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True, readingOrder=2)
@@ -621,7 +644,8 @@ def _build_excel_example_row(ws, cols, project_names):
     EX_FILL = PatternFill("solid", fgColor="F0F4FA")
     EXAMPLE = [
         "علی", "احمدی", "ali.ahmadi", "Pass1234",
-        "0123456789", "مرد", "123456",
+        "0123456789", "15170100", "27000025125123456", "اصفهان",
+        "مرد", "123456",
         "09121234567", "09129999999",
         "حسین", "1360/05/15", "تهران",
         "متاهل", "02112345678", "تهران، خیابان ولیعصر",
@@ -651,12 +675,14 @@ def _add_excel_validations(ws, wb, cols, project_names):
                 return get_column_letter(ci)
         return "A"
 
+    gender_col = _col_letter("gender")
     dv_gender = DataValidation(type="list", formula1='"مرد,زن"', allow_blank=True, showDropDown=False)
-    dv_gender.sqref = "F5:F2000"
+    dv_gender.sqref = f"{gender_col}5:{gender_col}2000"
     ws.add_data_validation(dv_gender)
 
+    marital_col = _col_letter("marital_status")
     dv_marital = DataValidation(type="list", formula1='"مجرد,متاهل,مطلقه,بیوه"', allow_blank=True, showDropDown=False)
-    dv_marital.sqref = "M5:M2000"
+    dv_marital.sqref = f"{marital_col}5:{marital_col}2000"
     ws.add_data_validation(dv_marital)
 
     share_col = _col_letter("share_type")
@@ -694,6 +720,9 @@ def _build_excel_guide_sheet(wb, cols):
         ("نام کاربری", "بله", "منحصربه‌فرد — برای ورود به سامانه"),
         ("رمز عبور", "بله", "حداقل ۴ کاراکتر"),
         ("کد ملی", "خیر", "۱۰ رقم بدون خط تیره"),
+        ("کدپرسنلی", "خیر", "کد پرسنلی عضو در سازمان"),
+        ("شناسه واریز", "خیر", "شناسه یکتای واریز بانکی — برای تطبیق خودکار واریزی‌ها با این عضو"),
+        ("واحد سازمانی", "خیر", "واحد/استان محل خدمت عضو"),
         ("موبایل", "خیر", "مثال: 09121234567"),
         ("تلفن اضطراری", "خیر", "شماره تماس اضطراری"),
         ("نام پدر", "خیر", "نام پدر عضو"),
@@ -753,7 +782,9 @@ def _build_column_index(header_row: list) -> dict:
     COL_MAP = {
         "نام": "first_name", "نام خانوادگی": "last_name",
         "نام کاربری": "username", "رمز عبور": "password",
-        "کد ملی": "national_code", "جنسیت": "gender",
+        "کد ملی": "national_code", "کدپرسنلی": "personnel_code",
+        "شناسه واریز": "deposit_id", "واحد سازمانی": "org_unit",
+        "جنسیت": "gender",
         "شماره شناسنامه": "id_number", "موبایل": "phone",
         "تلفن اضطراری": "emergency_phone", "نام پدر": "father_name",
         "تاریخ تولد": "birth_date", "محل تولد": "birth_place",
@@ -798,7 +829,8 @@ def _import_single_row(row_num, row_vals, col_idx, created, skipped, errors):
                    ("postal_code",), ("id_number",), ("account_number",), ("iban",),
                    ("first_name",), ("last_name",), ("gender",), ("father_name",),
                    ("birth_date",), ("birth_place",), ("marital_status",),
-                   ("occupation",), ("email",), ("bank_name",)]}
+                   ("occupation",), ("email",), ("bank_name",),
+                   ("personnel_code",), ("deposit_id",), ("org_unit",)]}
     v_err = validate_user_fields(field_data)
     if v_err:
         errors.append({"row": row_num, "username": username, "error": v_err})
@@ -811,6 +843,11 @@ def _import_single_row(row_num, row_vals, col_idx, created, skipped, errors):
     nat_code = field_data.get("national_code")
     if nat_code and db_session.query(User).filter_by(national_code=nat_code).first():
         skipped.append({"row": row_num, "username": username, "reason": f"کد ملی {nat_code} تکراری است."})
+        return "skip"
+
+    dep_id = field_data.get("deposit_id")
+    if dep_id and db_session.query(User).filter_by(deposit_id=dep_id).first():
+        skipped.append({"row": row_num, "username": username, "reason": f"شناسه واریز {dep_id} تکراری است."})
         return "skip"
 
     fd = field_data  # مقادیر نرمال‌شده (ارقام فارسی → انگلیسی)
@@ -837,6 +874,9 @@ def _import_single_row(row_num, row_vals, col_idx, created, skipped, errors):
         bank_name=fd.get("bank_name") or None,
         account_number=fd.get("account_number") or None,
         iban=fd.get("iban") or None,
+        personnel_code=fd.get("personnel_code") or None,
+        deposit_id=fd.get("deposit_id") or None,
+        org_unit=fd.get("org_unit") or None,
         active=True,
         profile_complete=True,
     )

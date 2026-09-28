@@ -33,13 +33,13 @@ ADMIN_PASSWORD   = os.environ.get('ADMIN_PASSWORD',   'admin123')
 ADMIN_FIRST_NAME = os.environ.get('ADMIN_FIRST_NAME', 'مدیر')
 ADMIN_LAST_NAME  = os.environ.get('ADMIN_LAST_NAME',  'سامانه')
 
-SITE_TITLE    = os.environ.get('SITE_TITLE',    'هیئت امنای مسکن دادگستری زنجان')
-SITE_SUBTITLE = os.environ.get('SITE_SUBTITLE', 'سامانه آنلاین مدیریت دفترچه مالکیت')
+SITE_TITLE    = os.environ.get('SITE_TITLE',    'سامانه مدیریت اعضا و امور مالی')
+SITE_SUBTITLE = os.environ.get('SITE_SUBTITLE', 'سامانه آنلاین مدیریت اعضا و واریزی‌ها')
 SITE_PHONE    = os.environ.get('SITE_PHONE',    '')
 SITE_ADDRESS  = os.environ.get('SITE_ADDRESS',  '')
-EXEC_MANAGER  = os.environ.get('EXEC_MANAGER',  'علی غفاری')
-BOARD_REP     = os.environ.get('BOARD_REP',     'خلیل باقری')
-BOARD_TITLE   = os.environ.get('BOARD_TITLE',   'هیئت رئیسه امنای مسکن دادگستری استان زنجان')
+EXEC_MANAGER  = os.environ.get('EXEC_MANAGER',  '')
+BOARD_REP     = os.environ.get('BOARD_REP',     '')
+BOARD_TITLE   = os.environ.get('BOARD_TITLE',   'هیئت مدیره')
 
 # ─── اجرا ──────────────────────────────────────────────────────────────────────
 app = create_app()

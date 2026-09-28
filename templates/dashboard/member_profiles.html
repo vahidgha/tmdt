@@ -57,6 +57,8 @@ function filterTable() {
   renderTable(allMembers.filter(function(m) {
     return (m.full_name||'').toLowerCase().includes(q) ||
       (m.national_code||'').includes(q) ||
+      (m.personnel_code||'').includes(q) ||
+      (m.deposit_id||'').includes(q) ||
       (m.phone||'').includes(q);
   }));
 }
@@ -68,7 +70,7 @@ function renderTable(members) {
     return;
   }
   el.innerHTML = '<table class="tbl"><thead><tr>' +
-    '<th>ردیف</th><th>نام و نام‌خانوادگی</th><th>کد ملی</th><th>موبایل</th>' +
+    '<th>ردیف</th><th>نام و نام‌خانوادگی</th><th>کد ملی</th><th>کدپرسنلی</th><th>واحد سازمانی</th><th>موبایل</th>' +
     '<th>پروژه</th><th>دفترچه</th><th>سهم</th><th>وضعیت</th><th>پرونده</th>' +
     '</tr></thead><tbody>' +
     members.map(function(m, i) {
@@ -81,6 +83,8 @@ function renderTable(members) {
         '<td>' + (i+1) + '</td>' +
         '<td style="font-weight:700">' + esc(m.full_name||'—') + '</td>' +
         '<td class="mono">' + esc(m.national_code||'—') + '</td>' +
+        '<td class="mono">' + esc(m.personnel_code||'—') + '</td>' +
+        '<td>' + esc(m.org_unit||'—') + '</td>' +
         '<td>' + esc(m.phone||'—') + '</td>' +
         '<td>' + esc(projName) + '</td>' +
         '<td class="mono">' + esc(bkCode) + '</td>' +
@@ -97,7 +101,9 @@ function openProfile(m) {
   var bks = m.booklets || [];
   var rows = [
     ['نام','first_name'], ['نام خانوادگی','last_name'], ['نام پدر','father_name'],
-    ['کد ملی','national_code'], ['شماره شناسنامه','id_number'], ['تاریخ تولد','birth_date'],
+    ['کد ملی','national_code'], ['کدپرسنلی','personnel_code'], ['شناسه واریز','deposit_id'],
+    ['واحد سازمانی','org_unit'],
+    ['شماره شناسنامه','id_number'], ['تاریخ تولد','birth_date'],
     ['محل تولد','birth_place'], ['جنسیت','gender'], ['وضعیت تأهل','marital_status'],
     ['موبایل','phone'], ['تلفن ثابت','landline'], ['موبایل اضطراری','emergency_phone'],
     ['ایمیل','email'], ['آدرس','address'], ['کد پستی','postal_code'],

@@ -145,6 +145,7 @@ def vouchers_list():
     date_from  = (request.args.get("date_from") or "").strip()
     date_to    = (request.args.get("date_to") or "").strip()
     search     = (request.args.get("search") or "").strip()
+    unmatched  = request.args.get("unmatched") == "1"
     page       = request.args.get("page", 1, type=int)
     per_page   = min(request.args.get("per_page", 30, type=int) or 30, 200)
 
@@ -152,6 +153,8 @@ def vouchers_list():
     if user_id and is_finance:
         q = q.filter(DepositVoucher.user_id == user_id)
     if status:     q = q.filter(DepositVoucher.status == status)
+    if unmatched and is_finance:
+        q = q.filter(DepositVoucher.user_id.is_(None), DepositVoucher.source == "bank_import")
     if date_from:  q = q.filter(DepositVoucher.deposit_date >= date_from)
     if date_to:    q = q.filter(DepositVoucher.deposit_date <= date_to)
     if search:
@@ -282,6 +285,121 @@ def vouchers_void(vid):
     return jsonify(ok=True)
 
 
+@bp.post("/accounting/vouchers/import-bank-statement")
+@login_required
+def vouchers_import_bank_statement():
+    """
+    وارد کردن صورت‌حساب خام بانکی (خروجی مستقیم سامانه بانکداری) و تطبیق خودکار
+    هر ردیف واریزی با عضوی که «شناسه واریز» او داخل توضیحات تراکنش پیدا شود.
+    ردیف‌های بدون تطبیق هم به‌عنوان سند (بدون عضو) ثبت می‌شوند تا مبلغ در حساب دیده شود،
+    و بعداً از فهرست «بدون تطبیق» قابل اصلاح‌اند (ابطال و ثبت مجدد با عضو درست).
+    """
+    err = require_finance()
+    if err: return err
+
+    account = db_session.get(CoopAccount, parse_int(request.form.get("account_id")))
+    if not account:
+        return jsonify(error="حساب مقصد را انتخاب کنید."), 400
+
+    if "file" not in request.files:
+        return jsonify(error="فایل انتخاب نشده."), 400
+    f = request.files["file"]
+    if not f.filename.endswith((".xlsx", ".xls")):
+        return jsonify(error="فرمت فایل باید xlsx باشد."), 400
+
+    from openpyxl import load_workbook
+
+    from ...utils.bank_import import (build_deposit_id_map, cell_amount, cell_str,
+                                       extract_deposit_id_candidates, find_bank_header)
+
+    try:
+        wb = load_workbook(filename=f, data_only=True)
+    except Exception:
+        return jsonify(error="فایل اکسل معتبر نیست."), 400
+    ws = wb.active
+
+    header_row, col_idx = find_bank_header(ws)
+    if header_row is None:
+        return jsonify(error="ستون‌های صورت‌حساب پیدا نشد — مطمئن شوید فایل خروجی مستقیم بانک است."), 400
+
+    dep_map = build_deposit_id_map(
+        db_session.query(User).filter(User.deposit_id.isnot(None), User.deposit_id != "").all()
+    )
+
+    def g(row, key):
+        i = col_idx.get(key)
+        return row[i] if i is not None and i < len(row) else None
+
+    last_no = db_session.query(func.max(DepositVoucher.number)).scalar() or 1000
+    matched = unmatched = dup_count = zero_count = 0
+
+    for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+        amount = cell_amount(g(row, "deposit_amount"))
+        if amount <= 0:
+            zero_count += 1
+            continue
+
+        deposit_date = normalize_digits(cell_str(g(row, "date")).strip())
+        deposit_time = normalize_digits(cell_str(g(row, "time")).strip())
+        reference_no = normalize_digits(cell_str(g(row, "reference_no")))
+        branch_code  = cell_str(g(row, "branch_code"))
+        branch_name  = cell_str(g(row, "branch_name"))
+        channel      = cell_str(g(row, "channel"))
+        balance      = cell_amount(g(row, "balance")) or None
+        desc_raw     = " ".join(filter(None, (
+            cell_str(row[i]) for i in col_idx["desc_cols"] if i < len(row)
+        )))
+
+        dup = db_session.query(DepositVoucher).filter_by(
+            account_id=account.id, reference_no=reference_no,
+            deposit_date=deposit_date, deposit_time=deposit_time, amount=amount,
+        ).first()
+        if dup:
+            dup_count += 1
+            continue
+
+        user = None
+        for cand in extract_deposit_id_candidates(desc_raw):
+            user = dep_map.get(cand)
+            if user:
+                break
+
+        last_no += 1
+        v = DepositVoucher(
+            number=last_no,
+            user_id=user.id if user else None,
+            payer_name="" if user else (desc_raw[:120] or "نامشخص"),
+            account_id=account.id,
+            amount=amount,
+            deposit_date=deposit_date,
+            deposit_time=deposit_time,
+            method="cash" if "نقد" in desc_raw else "transfer",
+            reference_no=reference_no,
+            description=desc_raw or None,
+            source="bank_import",
+            branch_code=branch_code,
+            branch_name=branch_name,
+            channel=channel,
+            bank_balance_after=balance,
+            created_by=current_user.id,
+        )
+        db_session.add(v)
+        if user:
+            matched += 1
+        else:
+            unmatched += 1
+
+    db_session.commit()
+    log_activity(
+        "voucher_bank_import",
+        f"واردات صورت‌حساب بانکی حساب {account.holder_name}: "
+        f"{matched} واریزی تطبیق‌یافته، {unmatched} بدون تطبیق، {dup_count} تکراری نادیده‌گرفته‌شده",
+        "finance",
+    )
+    return jsonify(ok=True, matched=matched, unmatched=unmatched,
+                   skipped_duplicate=dup_count, skipped_zero=zero_count), 201
+
+
 @bp.get("/accounting/summary")
 @login_required
 def accounting_summary():
@@ -299,12 +417,25 @@ def accounting_summary():
                        .filter_by(account_id=a.id, status="active").scalar())
         e_count  = db_session.query(func.count(ExpenseVoucher.id)).filter_by(
                        account_id=a.id, status="active").scalar()
+        # آخرین «مانده» گزارش‌شده در صورت‌حساب بانکی وارد‌شده — برای تطبیق دستی
+        # موجودی محاسبه‌شده سامانه با آخرین مانده اعلامی خود بانک
+        last_import = (db_session.query(DepositVoucher)
+                       .filter(DepositVoucher.account_id == a.id,
+                               DepositVoucher.source == "bank_import",
+                               DepositVoucher.bank_balance_after.isnot(None))
+                       .order_by(DepositVoucher.deposit_date.desc(),
+                                 DepositVoucher.deposit_time.desc(),
+                                 DepositVoucher.id.desc())
+                       .first())
         result.append({
             "account": a.to_dict(),
             "total_amount": deposits,          # سازگاری قبلی
             "deposits": deposits, "expenses": expenses,
             "balance": deposits - expenses,
             "voucher_count": d_count, "expense_count": e_count,
+            "bank_reported_balance": last_import.bank_balance_after if last_import else None,
+            "bank_reported_at": (f"{last_import.deposit_date} {last_import.deposit_time}".strip()
+                                 if last_import else None),
         })
     return jsonify(summary=result)
 
@@ -785,11 +916,41 @@ def members_balances():
             continue
         result.append({
             "id": m.id, "full_name": m.full_name, "national_code": m.national_code or "",
+            "personnel_code": m.personnel_code or "", "org_unit": m.org_unit or "",
             "debt": debt, "paid": paid, "remaining_debt": max(0, debt - paid),
             "deposited": deposited,
         })
     result.sort(key=lambda x: -x["remaining_debt"])
     return jsonify(members=result)
+
+
+@bp.get("/accounting/org-units-summary")
+@login_required
+def org_units_summary():
+    """
+    جمع واریزی‌های تطبیق‌یافته (متعلق به یک عضو) به تفکیک «واحد سازمانی» —
+    برای مقایسه میزان مشارکت هر واحد/استان در تأمین مالی پروژه.
+    ردیف‌های بدون واحد سازمانی ثبت‌شده زیر عنوان «نامشخص» جمع می‌شوند.
+    """
+    err = require_finance()
+    if err: return err
+
+    rows = (db_session.query(func.coalesce(User.org_unit, "نامشخص"),
+                             func.coalesce(func.sum(DepositVoucher.amount), 0),
+                             func.count(DepositVoucher.id),
+                             func.count(func.distinct(User.id)))
+            .join(User, DepositVoucher.user_id == User.id)
+            .filter(DepositVoucher.status == "active")
+            .group_by(func.coalesce(User.org_unit, "نامشخص"))
+            .order_by(func.sum(DepositVoucher.amount).desc())
+            .all())
+
+    result = [
+        {"org_unit": org_unit, "total_amount": int(total), "voucher_count": int(cnt), "member_count": int(mcnt)}
+        for org_unit, total, cnt, mcnt in rows
+    ]
+    grand_total = sum(r["total_amount"] for r in result)
+    return jsonify(org_units=result, grand_total=grand_total)
 
 
 # ── خروجی Excel/PDF ─────────────────────────────────────────────────────────

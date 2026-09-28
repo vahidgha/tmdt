@@ -26,7 +26,7 @@ def _site_title() -> str:
     from .. import db_session
     from ..models import SiteSetting
     row = db_session.get(SiteSetting, "site_title")
-    return row.value if row else "تعاونی مسکن دادگستری کل استان زنجان"
+    return row.value if row else "سامانه مدیریت اعضا و امور مالی"
 
 
 def _now_jalali_str() -> str:

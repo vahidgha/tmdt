@@ -45,6 +45,10 @@ class User(UserMixin, Base):
     active           = Column(Boolean, default=True)
     profile_complete = Column(Boolean, default=True)
 
+    personnel_code   = Column(String(20))               # کدپرسنلی
+    deposit_id       = Column(String(30), unique=True)  # شناسه واریز — برای تطبیق خودکار واریزی‌های بانکی
+    org_unit         = Column(String(80))               # واحد سازمانی (استان/واحد محل خدمت)
+
     father_name      = Column(String(80))
     birth_date       = Column(String(20))
     birth_place      = Column(String(60))
@@ -450,6 +454,13 @@ class DepositVoucher(Base):
     created_by    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
 
+    # فیلدهای مخصوص واردات صورت‌حساب بانکی خام (تطبیق خودکار با شناسه واریز عضو)
+    source              = Column(String(20), default="manual")  # manual | bank_import
+    branch_code         = Column(String(20), default="")
+    branch_name         = Column(String(80), default="")
+    channel             = Column(String(20), default="")        # TELLER, ATM, ...
+    bank_balance_after  = Column(BigInteger, nullable=True)      # مانده حساب بلافاصله پس از این تراکنش (طبق صورت‌حساب بانک)
+
     user    = relationship("User",        foreign_keys=[user_id])
     account = relationship("CoopAccount", foreign_keys=[account_id])
     creator = relationship("User",        foreign_keys=[created_by])
@@ -472,6 +483,10 @@ class DepositVoucher(Base):
             "status": self.status, "void_reason": self.void_reason or "",
             "created_by_name": self.creator.full_name if self.creator else "",
             "created_at": self.created_at.isoformat(),
+            "source": self.source or "manual",
+            "branch_code": self.branch_code or "", "branch_name": self.branch_name or "",
+            "channel": self.channel or "", "bank_balance_after": self.bank_balance_after,
+            "matched": bool(self.user_id),
         }
 
 

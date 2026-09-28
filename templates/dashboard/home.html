@@ -10,7 +10,7 @@
         خوش آمدید، {{ user.full_name }}
       </h1>
       <p style="font-size:13px;color:rgba(242,235,216,.55);margin:0">
-        {{ 'پنل مدیریت هیئت امنای مسکن دادگستری زنجان' if user.role == 'admin' else 'سامانه دفترچه مالکیت — پنل کاربری' }}
+        {{ 'پنل مدیریت' if user.role == 'admin' else 'پنل کاربری' }}
       </p>
     </div>
     <div class="banner-icon">
