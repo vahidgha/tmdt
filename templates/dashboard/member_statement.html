@@ -1,0 +1,131 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<style>
+@media print{.no-print{display:none!important}.shell,.hdr,.sidebar{display:none!important}.main{padding:0!important}}
+.st-tx-debit{color:var(--bad)}
+.st-tx-credit{color:var(--ok)}
+</style>
+
+<div class="no-print" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <a class="btn btn-ghost" href="/dashboard/accounting">بازگشت</a>
+  <button class="btn btn-navy" onclick="window.print()">🖨 چاپ</button>
+  <a class="btn btn-outline" href="/api/accounting/member/{{ target_uid }}/statement/export?format=xlsx" download>📊 خروجی Excel</a>
+  <a class="btn btn-outline" href="/api/accounting/member/{{ target_uid }}/statement/export?format=pdf" download>📄 خروجی PDF</a>
+  {% if user.role in ('admin','finance') %}
+  <button class="btn btn-gold" onclick="modal.open('ledgerModal')">+ سند دستی (بدهکار/بستانکار)</button>
+  {% endif %}
+</div>
+
+<div class="card card-p">
+  <h1 class="pg-title" style="margin-bottom:4px">کارت حساب — {{ target_name }}</h1>
+  <div id="stNat" style="font-size:13px;color:var(--muted);margin-bottom:16px"></div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
+    <div class="card card-p"><div style="font-size:12px;color:var(--muted)">کل بدهی</div><b id="tDebt" style="font-size:18px"></b></div>
+    <div class="card card-p"><div style="font-size:12px;color:var(--muted)">پرداخت‌شده/بستانکار</div><b id="tPaid" style="font-size:18px;color:var(--ok)"></b></div>
+    <div class="card card-p"><div style="font-size:12px;color:var(--muted)">مانده بدهی</div><b id="tRem" style="font-size:18px;color:var(--bad)"></b></div>
+    <div class="card card-p"><div style="font-size:12px;color:var(--muted)">کل واریزی</div><b id="tDep" style="font-size:18px"></b></div>
+    <div class="card card-p"><div style="font-size:12px;color:var(--muted)">واریزی تخصیص‌نیافته</div><b id="tUnalloc" style="font-size:18px"></b></div>
+  </div>
+
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>تاریخ</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th><th>مانده</th><th>وضعیت/یادداشت</th>{% if user.role in ('admin','finance') %}<th>عملیات</th>{% endif %}</tr></thead>
+    <tbody id="txBody"></tbody>
+  </table></div>
+</div>
+
+{% if user.role in ('admin','finance') %}
+<!-- Modal: سند دستی بدهکار/بستانکار -->
+<div class="modal" id="ledgerModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title">سند دستی بدهکار/بستانکار</span><button class="modal-x" onclick="modal.close('ledgerModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>نوع سند</label>
+        <select class="input" id="lgType">
+          <option value="debit">بدهکار (افزایش بدهی عضو — مثل جریمه دیرکرد)</option>
+          <option value="credit">بستانکار (کاهش بدهی عضو — مثل تخفیف یا اصلاح حساب)</option>
+        </select>
+      </div>
+      <div class="field"><label>عنوان *</label><input class="input" id="lgTitle" placeholder="مثال: جریمه دیرکرد قسط مرداد"></div>
+      <div class="field"><label>تاریخ *</label><input class="input" id="lgDate" data-jdp placeholder="1405/05/13"></div>
+      <div class="field"><label>مبلغ (ریال) *</label><input class="input" type="text" id="lgAmount" data-amount inputmode="numeric"></div>
+      <div class="field"><label>یادداشت (اختیاری)</label><textarea class="input" id="lgNote" rows="2"></textarea></div>
+      <div id="lgErr" class="alert alert-bad" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="addLedgerEntry(this)">ثبت سند</button>
+      <button class="btn btn-ghost" onclick="modal.close('ledgerModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+var IS_FINANCE = {{ 'true' if user.role in ('admin','finance') else 'false' }};
+function fmt(n){return Number(n||0).toLocaleString();}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var stLbl={paid:'پرداخت‌شده',overdue:'معوق',unpaid:'پرداخت‌نشده'};
+var srcLbl={payment:'قسط',voucher:'واریز',ledger:'سند دستی'};
+
+function loadStatement(){
+  fetch('/api/accounting/member/{{ target_uid }}/statement').then(function(r){return r.json();}).then(function(d){
+    document.getElementById('stNat').textContent=d.member.national_code?('کد ملی: '+d.member.national_code):'';
+    var t=d.totals;
+    document.getElementById('tDebt').textContent=fmt(t.debt)+' ریال';
+    document.getElementById('tPaid').textContent=fmt(t.paid)+' ریال';
+    document.getElementById('tRem').textContent=fmt(t.remaining_debt)+' ریال';
+    document.getElementById('tDep').textContent=fmt(t.deposited)+' ریال';
+    document.getElementById('tUnalloc').textContent=fmt(t.unallocated)+' ریال';
+    var tb=document.getElementById('txBody');
+    var colspan=IS_FINANCE?7:6;
+    if(!d.transactions.length){tb.innerHTML='<tr><td colspan="'+colspan+'"><div class="empty" style="padding:20px">تراکنشی نیست</div></td></tr>';return;}
+    tb.innerHTML=d.transactions.map(function(x){
+      var debit=x.type==='debit';
+      var note=x.source==='payment'?(stLbl[x.status]||''):(x.reference_no||x.note||'');
+      var actions='';
+      if(IS_FINANCE){
+        actions='<td>'+(x.source==='ledger'?'<button class="btn-outline bad btn-sm" onclick="voidLedgerEntry('+x.id+',this)">ابطال</button>':'<span style="color:var(--muted);font-size:11px">'+srcLbl[x.source]+'</span>')+'</td>';
+      }
+      return '<tr><td class="mono" style="font-size:12px">'+esc(x.date)+'</td><td>'+esc(x.title)+'</td>'+
+        '<td class="mono st-tx-debit">'+(debit?fmt(x.amount):'')+'</td>'+
+        '<td class="mono st-tx-credit">'+(!debit?fmt(x.amount):'')+'</td>'+
+        '<td class="mono" style="font-size:12px">'+fmt(x.balance)+'</td>'+
+        '<td style="font-size:12px">'+esc(note)+'</td>'+actions+'</tr>';
+    }).join('');
+  });
+}
+loadStatement();
+
+window.addLedgerEntry = async function(btn){
+  var errEl=document.getElementById('lgErr');
+  errEl.style.display='none';
+  var body={
+    entry_type: document.getElementById('lgType').value,
+    title: document.getElementById('lgTitle').value.trim(),
+    entry_date: document.getElementById('lgDate').value.trim(),
+    amount: getRawAmt(document.getElementById('lgAmount')),
+    note: document.getElementById('lgNote').value.trim(),
+  };
+  btnLoading(btn,true);
+  try{
+    var r=await fetch('/api/accounting/member/{{ target_uid }}/ledger',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d=await r.json();
+    btnLoading(btn,false);
+    if(r.ok){ modal.close('ledgerModal'); toast('سند ثبت شد'); loadStatement(); }
+    else { errEl.textContent=d.error||'خطا در ثبت سند'; errEl.style.display=''; }
+  }catch(e){ btnLoading(btn,false); errEl.textContent='خطا در ارتباط با سرور'; errEl.style.display=''; }
+};
+
+window.voidLedgerEntry = async function(id, btn){
+  if(!await confirmAction('این سند دستی ابطال شود؟')) return;
+  var reason=prompt('دلیل ابطال (اختیاری):','') || '';
+  btnLoading(btn,true);
+  var r=await fetch('/api/accounting/ledger/'+id+'/void',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})});
+  btnLoading(btn,false);
+  if(r.ok){ toast('سند ابطال شد'); loadStatement(); }
+  else { var d=await r.json(); toast(d.error||'خطا','error'); }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _desc  = 'بازار خرید و فروش دفترچه‌ها و امتیازات اعضای ' ~ _title ~ ' — مشاهده آگهی‌های تأییدشده، جستجو و ارتباط مستقیم با فروشنده.' %}
+  {% set _url   = request.url_root.rstrip('/') + '/marketplace' %}
+  <title>بازار خرید و فروش دفترچه‌ها — {{ _title }}</title>
+  <meta name="description" content="{{ _desc }}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{{ _url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fa_IR">
+  <meta property="og:url" content="{{ _url }}">
+  <meta property="og:title" content="بازار خرید و فروش دفترچه‌ها — {{ _title }}">
+  <meta property="og:description" content="{{ _desc }}">
+  {% if settings.get('site_logo') %}
+  <link rel="apple-touch-icon" href="/uploads/{{ settings.site_logo }}">
+  <link rel="icon" type="image/png" href="/uploads/{{ settings.site_logo }}">
+  {% else %}
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  {% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/public.css?v={{ app_version }}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": {{ _title|tojson }}, "item": {{ (request.url_root.rstrip('/') ~ '/')|tojson }} },
+      {"@type": "ListItem", "position": 2, "name": "بازار خرید و فروش دفترچه‌ها", "item": {{ _url|tojson }} }
+    ]
+  }
+  </script>
+  <style>
+    .mkt-hero {
+      background: linear-gradient(160deg, #12172B 0%, #1E2545 60%, #15213A 100%);
+      padding: 140px 20px 50px; position: relative; overflow: hidden;
+    }
+    .mkt-hero::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 60% at 50% 20%, rgba(184,146,90,.13) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .mkt-hero-inner { max-width: 1100px; margin: 0 auto; position: relative; }
+    .mkt-hero .sec-kicker { color: var(--p-gold); }
+    .mkt-hero h1 { font-size: clamp(24px,4vw,38px); font-weight: 800; color: #F5F1E6; margin: 12px 0 8px; }
+    .mkt-hero p { color: rgba(230,228,220,.7); font-size: 14.5px; max-width: 600px; }
+
+    .mkt-filters {
+      background: var(--p-card); border: 1px solid var(--p-border); border-radius: var(--p-r2);
+      padding: 18px 20px; box-shadow: var(--p-sh-m);
+      display: flex; flex-wrap: nowrap; gap: 10px; align-items: center;
+      margin-top: -34px; position: relative; z-index: 5;
+      width: 100%; max-width: 1100px; margin-inline: auto;
+    }
+    @media (max-width: 640px) {
+      .mkt-filters { flex-wrap: wrap; }
+    }
+    .mkt-filters input, .mkt-filters select {
+      font-family: inherit; font-size: 13px; padding: 9px 12px;
+      border: 1.5px solid var(--p-border); border-radius: var(--p-r);
+      background: var(--p-bg); color: var(--p-text); min-width: 0;
+    }
+    .mkt-filters input:focus, .mkt-filters select:focus { outline: none; border-color: var(--p-gold); }
+    .mkt-f-search { flex: 2 1 220px; }
+    .mkt-f-sel { flex: 1 1 130px; }
+    .mkt-filters button {
+      background: var(--p-navy); color: #fff; border: none; border-radius: var(--p-r);
+      padding: 9px 20px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    }
+
+    .mkt-section { max-width: 1100px; margin: 0 auto; padding: 40px 20px 90px; }
+    .mkt-count { font-size: 13px; color: var(--p-muted); margin-bottom: 18px; }
+    .mkt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 20px; }
+    .mkt-card {
+      background: var(--p-card); border: 1px solid var(--p-border); border-radius: var(--p-r2);
+      overflow: hidden; box-shadow: var(--p-sh-s); text-decoration: none; color: inherit;
+      display: flex; flex-direction: column;
+      transition: box-shadow .2s var(--p-ease), transform .2s var(--p-ease);
+    }
+    .mkt-card:hover { box-shadow: var(--p-sh-l); transform: translateY(-3px); }
+    .mkt-card-top {
+      background: linear-gradient(135deg, var(--p-navy), var(--p-navy-h));
+      padding: 16px 18px; color: #F2EBD8; position: relative;
+    }
+    .mkt-card-badge {
+      position: absolute; top: 12px; left: 12px;
+      background: rgba(184,146,90,.18); border: 1px solid rgba(184,146,90,.4);
+      color: var(--p-gold-h); font-size: 10.5px; font-weight: 700;
+      padding: 3px 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .mkt-card-title { font-size: 15px; font-weight: 800; margin-top: 20px; line-height: 1.5; }
+    .mkt-card-code { font-size: 11px; opacity: .6; margin-top: 4px; font-family: monospace; }
+    .mkt-card-body { padding: 16px 18px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .mkt-card-price { font-size: 19px; font-weight: 900; color: var(--p-gold-deep); }
+    .mkt-card-meta { display: flex; flex-wrap: wrap; gap: 7px; font-size: 11.5px; }
+    .mkt-chip {
+      background: var(--p-bg); border: 1px solid var(--p-border); border-radius: 7px;
+      padding: 3px 9px; color: var(--p-text2); font-weight: 600;
+    }
+    .mkt-chip.gold { background: rgba(184,146,90,.1); border-color: rgba(184,146,90,.3); color: var(--p-gold-deep); }
+    .mkt-card-cta {
+      margin-top: auto; text-align: center; background: var(--p-navy); color: #fff;
+      font-size: 13px; font-weight: 700; padding: 10px; border-radius: var(--p-r);
+    }
+    .mkt-empty { text-align: center; padding: 60px 20px; color: var(--p-muted); }
+    .mkt-pagination { display: flex; justify-content: center; gap: 8px; margin-top: 32px; }
+    .mkt-pagination a, .mkt-pagination span {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 36px; height: 36px; border-radius: var(--p-r); font-size: 13px; font-weight: 700;
+      border: 1.5px solid var(--p-border); text-decoration: none; color: var(--p-text2);
+    }
+    .mkt-pagination .on { background: var(--p-navy); color: #fff; border-color: var(--p-navy); }
+  </style>
+</head>
+<body class="pub">
+
+<div class="pub-nav-wrap">
+  <nav class="pub-nav liquid-glass">
+    <div class="pub-nav-inner">
+      <a href="/" class="pub-nav-brand" style="text-decoration:none">
+        <div class="pub-nav-logo">
+          {% if settings.get('site_logo') %}
+          <img src="/uploads/{{ settings.site_logo }}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">
+          {% else %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+          {% endif %}
+        </div>
+        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+      </a>
+      <div class="pub-nav-links">
+        <a href="/marketplace" class="pub-nav-link" style="color:var(--p-gold)">بازار خرید و فروش</a>
+        <a href="/about" class="pub-nav-link">درباره ما</a>
+      </div>
+      <a href="/login" class="pub-nav-btn">ورود اعضا</a>
+    </div>
+  </nav>
+</div>
+
+<section class="mkt-hero">
+  <div class="mkt-hero-inner">
+    <div class="sec-kicker">🏬 بازار رسمی تعاونی</div>
+    <h1>بازار خرید و فروش دفترچه‌ها</h1>
+    <p>آگهی‌های دفترچه مالکیت و امتیاز اعضا — همه پیش از انتشار توسط تعاونی بررسی و تأیید می‌شوند.</p>
+  </div>
+</section>
+
+<form class="mkt-filters" method="GET" action="/marketplace">
+  <input class="mkt-f-search" type="text" name="q" placeholder="جستجو در عنوان یا کد آگهی…" value="{{ filters.get('q','') }}">
+  <select class="mkt-f-sel" name="project_id">
+    <option value="">همه پروژه‌ها</option>
+    {% for p in projects %}
+    <option value="{{ p.id }}" {% if filters.get('project_id')|string == p.id|string %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+  <select class="mkt-f-sel" name="sort">
+    <option value="newest" {% if filters.get('sort','newest')=='newest' %}selected{% endif %}>جدیدترین</option>
+    <option value="cheapest" {% if filters.get('sort')=='cheapest' %}selected{% endif %}>ارزان‌ترین</option>
+    <option value="expensive" {% if filters.get('sort')=='expensive' %}selected{% endif %}>گران‌ترین</option>
+  </select>
+  <button type="submit">جستجو</button>
+</form>
+
+<div class="mkt-section">
+  <div class="mkt-count">{{ total }} آگهی یافت شد</div>
+
+  {% if listings %}
+  <div class="mkt-grid">
+    {% for l in listings %}
+    <a class="mkt-card" href="/marketplace/{{ l.slug }}">
+      <div class="mkt-card-top">
+        <span class="mkt-card-badge">✓ تأیید شده توسط تعاونی</span>
+        <div class="mkt-card-title">{{ l.title }}</div>
+        <div class="mkt-card-code">{{ l.code }}</div>
+      </div>
+      <div class="mkt-card-body">
+        <div class="mkt-card-price">{{ "{:,}".format(l.price) }} تومان</div>
+        <div class="mkt-card-meta">
+          {% if l.project %}<span class="mkt-chip">پروژه: {{ l.project.name }}</span>{% endif %}
+          {% if l.area %}<span class="mkt-chip">{{ l.area }} متر</span>{% endif %}
+          {% if l.unit_type %}<span class="mkt-chip">{{ l.unit_type }}</span>{% endif %}
+          <span class="mkt-chip {% if l.negotiable %}gold{% endif %}">{{ 'قابل مذاکره' if l.negotiable else 'غیرقابل مذاکره' }}</span>
+        </div>
+        <div class="mkt-card-cta">مشاهده جزئیات</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if pages > 1 %}
+  <div class="mkt-pagination">
+    {% for p in range(1, pages+1) %}
+    <a class="{% if p==page %}on{% endif %}" href="?page={{ p }}{% if filters.get('q') %}&q={{ filters.get('q') }}{% endif %}{% if filters.get('project_id') %}&project_id={{ filters.get('project_id') }}{% endif %}{% if filters.get('sort') %}&sort={{ filters.get('sort') }}{% endif %}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="mkt-empty">
+    <div style="font-size:40px;margin-bottom:12px">📭</div>
+    در حال حاضر آگهی‌ای با این مشخصات یافت نشد.
+  </div>
+  {% endif %}
+</div>
+
+<footer class="pub-footer">
+  <div class="pub-container">
+    <div class="footer-copy">
+      تمامی حقوق مادی و معنوی این سامانه محفوظ و متعلق به <a href="https://Noyan.team" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline"><strong>نویان فناور آریا</strong></a> است.
+      <span style="opacity:.6;font-size:11px;margin-right:8px">نسخه {{ app_version }}</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

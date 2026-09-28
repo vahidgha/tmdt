@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}تأیید کد بله{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <canvas id="loginBg"></canvas>
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.26 1.3h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 9.4A16 16 0 0 0 14 16.31l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </svg>
+    </div>
+    <h1 class="login-title">تأیید کد بازیابی رمز عبور</h1>
+    <p class="login-sub">کد ۶ رقمی برای شما ارسال شد — لطفاً کمی صبوری بفرمایید و آن را در کادر زیر وارد کنید</p>
+
+    {% if error %}
+    <div class="alert alert-bad">{{ error }}</div>
+    {% endif %}
+    <div id="resendMsg" class="alert alert-ok" style="display:none"></div>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="verify">
+      <div class="field">
+        <label>کد تأیید</label>
+        <input name="otp" class="input" placeholder="کد ۶ رقمی" autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="6" style="letter-spacing:6px;font-size:22px;text-align:center">
+      </div>
+      <button type="submit" class="btn btn-navy btn-block" style="margin-top:6px">تأیید کد</button>
+    </form>
+    <div style="text-align:center;margin-top:14px">
+      <span id="resendCountdown" style="color:var(--muted);font-size:13px"></span>
+      <button type="button" id="resendBtn" onclick="resendOtp(this)" style="display:none;background:none;border:none;color:var(--gold);font-size:13px;cursor:pointer;padding:0;font-family:inherit">ارسال مجدد کد</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){var c=document.getElementById('loginBg');if(!c)return;var x=c.getContext('2d'),W,H,t=0;function r(){W=c.width=innerWidth;H=c.height=innerHeight;}window.addEventListener('resize',r);r();(function d(){x.clearRect(0,0,W,H);var g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#020712');g.addColorStop(1,'#0A1522');x.fillStyle=g;x.fillRect(0,0,W,H);t++;requestAnimationFrame(d);})();})();
+
+/* شمارش معکوس ۵ دقیقه‌ای — تا کد قبلی معتبر است، دکمه ارسال مجدد غیرفعال است */
+(function () {
+  var COUNTDOWN_KEY = 'otpResendAt';
+  var countdownEl = document.getElementById('resendCountdown');
+  var resendBtn    = document.getElementById('resendBtn');
+  var deadline = parseInt(sessionStorage.getItem(COUNTDOWN_KEY) || '0', 10);
+  var now = Date.now();
+  if (!deadline || deadline < now) {
+    deadline = now + 5 * 60 * 1000;
+    sessionStorage.setItem(COUNTDOWN_KEY, String(deadline));
+  }
+
+  var timer = null;
+  function startCountdown() {
+    if (timer) clearInterval(timer);
+    countdownEl.style.display = '';
+    resendBtn.style.display = 'none';
+    timer = setInterval(function () {
+      var remain = Math.max(0, deadline - Date.now());
+      if (remain <= 0) {
+        clearInterval(timer);
+        countdownEl.style.display = 'none';
+        resendBtn.style.display = '';
+        return;
+      }
+      var m = Math.floor(remain / 60000);
+      var s = Math.floor((remain % 60000) / 1000);
+      countdownEl.textContent = 'اگر کد دریافت نشد، تا ' + m + ':' + (s < 10 ? '0' : '') + s + ' دیگر می‌توانید دوباره درخواست دهید';
+    }, 1000);
+  }
+  startCountdown();
+
+  window.resendOtp = function (btn) {
+    var msgEl = document.getElementById('resendMsg');
+    btn.disabled = true;
+    fetch('/resend-otp', { method: 'POST' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        btn.disabled = false;
+        if (!x.ok) {
+          msgEl.className = 'alert alert-bad'; msgEl.textContent = x.d.error || 'ارسال کد با خطا مواجه شد.';
+          msgEl.style.display = '';
+          return;
+        }
+        msgEl.className = 'alert alert-ok';
+        msgEl.textContent = 'کد جدید ارسال شد — لطفاً کمی صبوری بفرمایید.';
+        msgEl.style.display = '';
+        deadline = Date.now() + 5 * 60 * 1000;
+        sessionStorage.setItem(COUNTDOWN_KEY, String(deadline));
+        startCountdown();
+      })
+      .catch(function () {
+        msgEl.className = 'alert alert-bad'; msgEl.textContent = 'خطا در ارتباط با سرور';
+        msgEl.style.display = ''; btn.disabled = false;
+      });
+  };
+})();
+</script>
+{% endblock %}

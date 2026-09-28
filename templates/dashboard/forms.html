@@ -1,0 +1,171 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <div>
+    <h1 class="pg-title">فرم‌ساز</h1>
+    <p class="pg-sub">ایجاد و مدیریت فرم‌های پویا</p>
+  </div>
+  <button class="btn btn-gold" onclick="openCreate()">+ فرم جدید</button>
+</div>
+
+<!-- Stats -->
+<div class="stats-row" id="statsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px"></div>
+
+<!-- Form list -->
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+    <input class="input" id="searchQ" placeholder="جستجو در فرم‌ها…" style="max-width:280px" oninput="renderList()">
+    <select class="input" id="filterStatus" style="width:140px" onchange="renderList()">
+      <option value="">همه وضعیت‌ها</option>
+      <option value="draft">پیش‌نویس</option>
+      <option value="published">منتشرشده</option>
+      <option value="archived">بایگانی</option>
+    </select>
+  </div>
+  <div id="formList"><div class="loading-row">در حال بارگذاری…</div></div>
+</div>
+
+<!-- Create modal -->
+<div class="modal" id="createModal">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-head">
+      <span class="modal-title">فرم جدید</span>
+      <button class="modal-x" onclick="modal.close('createModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>عنوان فرم *</label><input class="input" id="fTitle" placeholder="مثال: فرم ثبت‌نام"></div>
+      <div class="field"><label>توضیحات</label><textarea class="input" id="fDesc" rows="3" placeholder="توضیح کوتاه درباره فرم…"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label>وضعیت</label>
+          <select class="input" id="fStatus">
+            <option value="draft">پیش‌نویس</option>
+            <option value="published">منتشر</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>دسترسی</label>
+          <select class="input" id="fPublic">
+            <option value="1">عمومی</option>
+            <option value="0">فقط اعضا</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="fMulti" style="width:16px;height:16px">
+          فرم چند مرحله‌ای (Wizard)
+        </label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="createForm(this)">ایجاد فرم و رفتن به ویرایشگر</button>
+      <button class="btn btn-ghost" onclick="modal.close('createModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.form-card{display:grid;grid-template-columns:1fr auto;align-items:start;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);transition:background .15s}
+.form-card:last-child{border-bottom:none}
+.form-card:hover{background:var(--hover)}
+.form-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.fc-actions{display:flex;gap:8px;flex-shrink:0}
+.loading-row{padding:40px;text-align:center;color:var(--muted)}
+.stats-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px}
+.stats-card .num{font-size:28px;font-weight:700;color:var(--gold)}
+.stats-card .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+</style>
+
+<script>
+let ALL_FORMS = [];
+
+const STATUS_LABEL = {draft:'پیش‌نویس', published:'منتشرشده', archived:'بایگانی'};
+const STATUS_COLOR = {draft:'badge-warn', published:'badge-ok', archived:'badge-muted'};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function escAttr(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'\\n').replace(/\r/g,''); }
+
+async function loadForms(){
+  const r = await fetch('/api/forms');
+  const d = await r.json();
+  ALL_FORMS = d.forms || [];
+  renderStats();
+  renderList();
+}
+
+function renderStats(){
+  const total = ALL_FORMS.length;
+  const pub   = ALL_FORMS.filter(f=>f.status==='published').length;
+  const subs  = ALL_FORMS.reduce((a,f)=>a+f.submission_count,0);
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stats-card"><div class="num">${total}</div><div class="lbl">کل فرم‌ها</div></div>
+    <div class="stats-card"><div class="num">${pub}</div><div class="lbl">منتشرشده</div></div>
+    <div class="stats-card"><div class="num">${subs}</div><div class="lbl">کل پاسخ‌ها</div></div>
+  `;
+}
+
+function renderList(){
+  const q   = document.getElementById('searchQ').value.toLowerCase();
+  const st  = document.getElementById('filterStatus').value;
+  let forms = ALL_FORMS.filter(f=>{
+    if(st && f.status !== st) return false;
+    if(q && !f.title.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const el = document.getElementById('formList');
+  if(!forms.length){el.innerHTML='<div class="loading-row">هیچ فرمی یافت نشد</div>';return;}
+  el.innerHTML = forms.map(f=>`
+    <div class="form-card">
+      <div>
+        <div style="font-weight:600;font-size:15px">${esc(f.title)}</div>
+        <div class="form-meta">
+          <span class="badge ${STATUS_COLOR[f.status]||''}">${esc(STATUS_LABEL[f.status]||f.status)}</span>
+          <span class="badge badge-muted">${f.submission_count} پاسخ</span>
+          <span class="badge badge-muted">${f.step_count} مرحله</span>
+          ${f.is_public?'<span class="badge" style="background:#0E1B3220;color:var(--muted)">عمومی</span>':'<span class="badge" style="background:#0E1B3220;color:var(--muted)">خصوصی</span>'}
+        </div>
+        ${f.description?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(f.description)}</div>`:''}
+      </div>
+      <div class="fc-actions">
+        <a href="/dashboard/forms/${f.id}/builder" class="btn btn-sm btn-navy">ویرایشگر</a>
+        <a href="/dashboard/forms/${f.id}/submissions" class="btn btn-sm btn-ghost">پاسخ‌ها</a>
+        <button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="deleteForm(${f.id},'${escAttr(f.title)}')">حذف</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCreate(){
+  document.getElementById('fTitle').value='';
+  document.getElementById('fDesc').value='';
+  document.getElementById('fStatus').value='draft';
+  document.getElementById('fMulti').checked=false;
+  modal.open('createModal');
+}
+
+async function createForm(btn){
+  const title = document.getElementById('fTitle').value.trim();
+  if(!title){showToast('عنوان فرم الزامی است','error');return;}
+  btn.disabled=true;btn.textContent='در حال ایجاد…';
+  const r = await fetch('/api/forms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    title,
+    description: document.getElementById('fDesc').value,
+    status:      document.getElementById('fStatus').value,
+    is_public:   document.getElementById('fPublic').value==='1',
+    multi_step:  document.getElementById('fMulti').checked,
+  })});
+  const d = await r.json();
+  if(r.ok){ window.location.href=`/dashboard/forms/${d.form.id}/builder`; }
+  else{ showToast(d.error||'خطا','error'); btn.disabled=false; btn.textContent='ایجاد فرم و رفتن به ویرایشگر'; }
+}
+
+async function deleteForm(id, title){
+  if(!confirm(`فرم «${title}» و تمام پاسخ‌های آن حذف شود؟`)) return;
+  const r = await fetch(`/api/forms/${id}`,{method:'DELETE'});
+  if(r.ok){ ALL_FORMS=ALL_FORMS.filter(f=>f.id!==id); renderStats(); renderList(); showToast('فرم حذف شد'); }
+  else showToast('خطا در حذف','error');
+}
+
+loadForms();
+</script>
+{% endblock %}

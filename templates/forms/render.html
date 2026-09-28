@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ form.title }}</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script src="/static/js/csrf.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Vazirmatn',Tahoma,sans-serif;background:#f0f4f8;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;direction:rtl}
+.form-wrap{width:100%;max-width:680px}
+.form-header{background:linear-gradient(135deg,#0E1B32,#1A2A50);color:#fff;border-radius:16px 16px 0 0;padding:28px 32px}
+.form-header h1{font-size:22px;font-weight:700;margin-bottom:6px;font-family:'Vazirmatn',Tahoma,sans-serif}
+.form-header p{opacity:.75;font-size:14px}
+.form-body{background:#fff;border-radius:0 0 16px 16px;padding:28px 32px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.step-indicator{display:flex;gap:8px;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #e5e7eb}
+.step-dot{width:28px;height:28px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#6b7280;transition:all .2s;flex-shrink:0}
+.step-dot.active{background:#0E1B32;color:#C8A456}
+.step-dot.done{background:#16a34a;color:#fff}
+.step-line{flex:1;height:2px;background:#e5e7eb;transition:background .2s}
+.step-line.done{background:#16a34a}
+.field-wrap{margin-bottom:20px}
+.field-wrap label{display:block;font-weight:600;font-size:14px;margin-bottom:6px;color:#1f2937}
+.field-wrap .required{color:#dc2626;margin-right:4px}
+.field-wrap .help{font-size:12px;color:#6b7280;margin-top:4px}
+.input{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:'Vazirmatn',Tahoma,sans-serif;direction:rtl;transition:border-color .15s}
+.input:focus{outline:none;border-color:#0E1B32;box-shadow:0 0 0 3px rgba(14,27,50,.1)}
+.input.error{border-color:#dc2626}
+.error-msg{color:#dc2626;font-size:12px;margin-top:4px}
+.radio-group,.checkbox-group{display:flex;flex-direction:column;gap:8px}
+.radio-group label,.checkbox-group label{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;font-size:14px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;transition:background .1s;font-family:'Vazirmatn',Tahoma,sans-serif}
+.radio-group label:hover,.checkbox-group label:hover{background:#f9fafb}
+.section-title{font-size:17px;font-weight:700;color:#0E1B32;padding-bottom:8px;border-bottom:2px solid #C8A456;margin-bottom:4px}
+.divider{border:none;border-top:1px solid #e5e7eb}
+.rating-group{display:flex;flex-direction:row-reverse;gap:4px}
+.rating-group input{display:none}
+.rating-group label{font-size:28px;color:#d1d5db;cursor:pointer;transition:color .1s}
+.rating-group input:checked~label,.rating-group label:hover,.rating-group label:hover~label{color:#f59e0b}
+.signature-pad{border:1px solid #d1d5db;border-radius:8px;cursor:crosshair;touch-action:none}
+.btn-group{display:flex;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb}
+.btn{padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-family:'Vazirmatn',Tahoma,sans-serif;font-weight:600;transition:all .15s}
+.btn-primary{background:#0E1B32;color:#C8A456}
+.btn-primary:hover{background:#1a2a50}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.btn-secondary{background:#f3f4f6;color:#374151}
+.btn-secondary:hover{background:#e5e7eb}
+.success-box{text-align:center;padding:40px 20px}
+.success-box .icon{font-size:60px;margin-bottom:16px}
+.success-box h2{font-size:22px;font-weight:700;color:#16a34a;margin-bottom:8px}
+.success-box p{color:#6b7280;font-size:15px}
+.file-drop{border:2px dashed #d1d5db;border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.file-drop:hover,.file-drop.drag-over{border-color:#0E1B32;background:#f9fafb}
+.file-drop input{display:none}
+
+/* ── Jalali Date Picker ─────────────────────────────── */
+.jdp-wrap{display:grid;grid-template-columns:2fr 2fr 1fr;gap:8px}
+.jdp-wrap select{font-family:'Vazirmatn',Tahoma,sans-serif;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;direction:rtl;background:#fff;transition:border-color .15s;appearance:none;cursor:pointer;width:100%}
+.jdp-wrap select:focus{outline:none;border-color:#0E1B32;box-shadow:0 0 0 3px rgba(14,27,50,.1)}
+.jdp-wrap select.error{border-color:#dc2626}
+.jdp-range{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.jdp-range-label{font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="form-wrap">
+  <div class="form-header">
+    <h1>{{ form.title }}</h1>
+    {% if form.description %}<p>{{ form.description }}</p>{% endif %}
+  </div>
+  <div class="form-body">
+    <div id="accessGate" style="display:none">
+      <p style="font-size:14px;color:#374151;margin-bottom:16px">این فرم اختصاصی است. لطفاً برای دسترسی، کد ملی یا شماره موبایل خود را وارد کنید.</p>
+      <div class="field-wrap"><label>کد ملی</label><input class="input" id="gateNat" maxlength="10" inputmode="numeric"></div>
+      <div class="field-wrap"><label>شماره موبایل</label><input class="input" id="gatePhone" maxlength="11" inputmode="numeric"></div>
+      <div class="error-msg" id="gateErr" style="margin-bottom:8px"></div>
+      <div class="btn-group" style="border-top:none;padding-top:0;margin-top:0">
+        <button type="button" class="btn btn-primary" id="gateBtn" onclick="checkGateAccess()">ادامه</button>
+      </div>
+    </div>
+    <div id="stepIndicator"></div>
+    <form id="mainForm" novalidate style="display:none">
+      <div id="formContent">در حال بارگذاری فرم…</div>
+      <div class="btn-group" id="btnGroup" style="display:none">
+        <button type="button" class="btn btn-secondary" id="btnPrev" onclick="prevStep()" style="display:none">قبلی</button>
+        <button type="button" class="btn btn-primary"   id="btnNext" onclick="nextStep()">بعدی</button>
+        <button type="submit"  class="btn btn-primary"   id="btnSubmit" style="display:none">ثبت فرم</button>
+      </div>
+    </form>
+    <div id="successBox" style="display:none" class="success-box">
+      <div class="icon">✅</div>
+      <h2>فرم با موفقیت ثبت شد!</h2>
+      <p id="successMsg">پاسخ شما دریافت شد. با تشکر.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Jalali ↔ Gregorian conversion — با تقویم فارسی داخلی مرورگر (Intl/ICU)
+   محاسبه می‌شود، نه فرمول دستی؛ فرمول قبلی (Borkowski) در برخی تاریخ‌ها چند
+   روز اشتباه محاسبه می‌کرد (مثلاً 1404/05/01 را به‌جای 2025-07-23 به
+   2025-07-18 تبدیل می‌کرد) که باعث ثبت تاریخ نادرست در پاسخ فرم‌ها می‌شد. */
+function _jalaliPartsOf(date){
+  var parts=new Intl.DateTimeFormat('en-US-u-ca-persian',{year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'}).formatToParts(date);
+  var o={}; parts.forEach(function(p){ if(p.type!=='literal') o[p.type]=parseInt(p.value); });
+  return {y:o.year,m:o.month,d:o.day};
+}
+function j2g(jy,jm,jd){
+  var guess=new Date(Date.UTC(jy+621,jm-1,jd));
+  for(var i=0;i<60;i++){
+    var cur=_jalaliPartsOf(guess);
+    if(cur.y===jy && cur.m===jm && cur.d===jd) return {y:guess.getUTCFullYear(),m:guess.getUTCMonth()+1,d:guess.getUTCDate()};
+    var diffDays=(jy-cur.y)*365+(jm-cur.m)*30+(jd-cur.d);
+    if(diffDays===0) diffDays=(jy>cur.y||(jy===cur.y&&(jm>cur.m||(jm===cur.m&&jd>cur.d))))?1:-1;
+    guess=new Date(guess.getTime()+diffDays*86400000);
+  }
+  return {y:guess.getUTCFullYear(),m:guess.getUTCMonth()+1,d:guess.getUTCDate()};
+}
+function g2j(gy,gm,gd){
+  return _jalaliPartsOf(new Date(Date.UTC(gy,gm-1,gd)));
+}
+var J_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+function jDaysInMonth(jy,jm){
+  if(jm<=6) return 31;
+  if(jm<=11) return 30;
+  // Esfand: check leap
+  var d=j2g(jy,12,29); // always valid
+  var next=j2g(jy,12,30);
+  // if converting jy/12/30 gives a valid date, it's leap
+  try{ var t=j2g(jy,12,30); return 30; }catch(e){ return 29; }
+}
+// Simpler leap check
+function jIsLeap(jy){ return (((jy-474)%2820+474+38)*682)%2816 < 682; }
+function jDays(jy,jm){ if(jm<=6) return 31; if(jm<=11) return 30; return jIsLeap(jy)?30:29; }
+
+function buildJdp(name, savedGreg){
+  // savedGreg: "YYYY-MM-DD" gregorian or ""
+  var sy='', sm='', sd='';
+  if(savedGreg){
+    var parts=savedGreg.split('-');
+    if(parts.length===3){
+      var j=g2j(parseInt(parts[0]),parseInt(parts[1]),parseInt(parts[2]));
+      sy=j.y; sm=j.m; sd=j.d;
+    }
+  }
+  var thisYear=g2j(new Date().getFullYear(),new Date().getMonth()+1,new Date().getDate()).y;
+  var years='<option value="">سال</option>';
+  for(var y=thisYear+2;y>=1350;y--) years+=`<option value="${y}"${sy==y?' selected':''}>${y}</option>`;
+  var months='<option value="">ماه</option>';
+  J_MONTHS.forEach(function(mn,i){ months+=`<option value="${i+1}"${sm==i+1?' selected':''}>${mn}</option>`; });
+  var days='<option value="">روز</option>';
+  var maxD=sm?jDays(sy||thisYear,parseInt(sm)):31;
+  for(var d=1;d<=maxD;d++) days+=`<option value="${d}"${sd==d?' selected':''}>${d}</option>`;
+
+  return `<div class="jdp-wrap" id="jdp_${name}">
+    <select id="jdp_y_${name}" onchange="jdpChange('${name}')">${years}</select>
+    <select id="jdp_m_${name}" onchange="jdpChange('${name}')">${months}</select>
+    <select id="jdp_d_${name}" onchange="jdpChange('${name}')">${days}</select>
+    <input type="hidden" name="${name}" id="jdp_h_${name}" value="${savedGreg||''}">
+  </div>`;
+}
+
+function jdpChange(name){
+  var yEl=document.getElementById('jdp_y_'+name);
+  var mEl=document.getElementById('jdp_m_'+name);
+  var dEl=document.getElementById('jdp_d_'+name);
+  var hEl=document.getElementById('jdp_h_'+name);
+  var jy=parseInt(yEl.value), jm=parseInt(mEl.value), jd=parseInt(dEl.value);
+  // refresh day options when year/month changes
+  if(jy && jm){
+    var maxD=jDays(jy,jm);
+    var curD=parseInt(dEl.value)||0;
+    dEl.innerHTML='<option value="">روز</option>';
+    for(var d=1;d<=maxD;d++) dEl.innerHTML+=`<option value="${d}"${curD===d?' selected':''}>${d}</option>`;
+    if(curD>maxD) dEl.value='';
+    jd=parseInt(dEl.value);
+  }
+  if(jy && jm && jd){
+    var g=j2g(jy,jm,jd);
+    var gStr=g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
+    hEl.value=gStr;
+    answers['field_'+name.split('field_')[1]]=gStr;
+  } else {
+    hEl.value='';
+  }
+}
+
+/* ── Form engine ─────────────────────────────────────────── */
+const SLUG = "{{ form.slug }}";
+let formData=null, steps=[], curStep=0, answers={};
+let accessNat='', accessPhone='';
+
+async function loadForm(){
+  const r=await fetch(`/api/public/forms/${SLUG}`);
+  if(!r.ok){ document.getElementById('formContent').innerHTML='<p style="color:#dc2626;text-align:center">فرم یافت نشد یا در دسترس نیست.</p>'; return; }
+  const d=await r.json();
+  formData=d.form; steps=formData.steps||[];
+  if(formData.restrict_access){
+    document.getElementById('accessGate').style.display='block';
+    return;
+  }
+  startForm();
+}
+
+function startForm(){
+  document.getElementById('accessGate').style.display='none';
+  document.getElementById('mainForm').style.display='block';
+  renderStep();
+  document.getElementById('btnGroup').style.display='flex';
+}
+
+async function checkGateAccess(){
+  const nat=document.getElementById('gateNat').value.trim();
+  const phone=document.getElementById('gatePhone').value.trim();
+  const errEl=document.getElementById('gateErr');
+  errEl.textContent='';
+  if(!nat && !phone){ errEl.textContent='کد ملی یا موبایل را وارد کنید'; return; }
+  const btn=document.getElementById('gateBtn');
+  btn.disabled=true; btn.textContent='در حال بررسی…';
+  const r=await fetch(`/api/public/forms/${SLUG}/check-access`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({national_code:nat, phone:phone}),
+  });
+  const d=await r.json();
+  btn.disabled=false; btn.textContent='ادامه';
+  if(!r.ok){ errEl.textContent=d.error||'شما مجاز به تکمیل این فرم نیستید.'; return; }
+  accessNat=nat; accessPhone=phone;
+  startForm();
+}
+
+function renderStep(){
+  renderIndicator();
+  const step=steps[curStep];
+  const fields=(step?.fields||[]).sort((a,b)=>a.order-b.order);
+  document.getElementById('formContent').innerHTML=fields.map(renderField).join('');
+  bindEvents();
+  document.querySelectorAll('[data-sig]').forEach(initSig);
+  const isLast=curStep===steps.length-1, isFirst=curStep===0;
+  document.getElementById('btnPrev').style.display=isFirst?'none':'';
+  document.getElementById('btnNext').style.display=isLast?'none':'';
+  document.getElementById('btnSubmit').style.display=isLast?'':'none';
+}
+
+function renderIndicator(){
+  if(steps.length<=1){ document.getElementById('stepIndicator').innerHTML=''; return; }
+  let html='<div class="step-indicator">';
+  steps.forEach((s,i)=>{
+    const cls=i<curStep?'done':i===curStep?'active':'';
+    html+=`<div class="step-dot ${cls}">${i<curStep?'✓':i+1}</div>`;
+    if(i<steps.length-1) html+=`<div class="step-line ${i<curStep?'done':''}"></div>`;
+  });
+  document.getElementById('stepIndicator').innerHTML=html+'</div>';
+}
+
+function renderField(f){
+  const saved=answers[`field_${f.id}`]||'';
+  const req=f.required?`<span class="required">*</span>`:'';
+  const help=f.help_text?`<div class="help">${f.help_text}</div>`:'';
+  const label=f.field_type!=='divider'?`<label>${f.label}${req}</label>`:'';
+  let input='';
+  switch(f.field_type){
+    case 'text': case 'email': case 'url': case 'national_code': case 'phone_ir': case 'iban':
+      input=`<input class="input" type="${f.field_type==='email'?'email':'text'}" name="field_${f.id}" placeholder="${f.placeholder||''}" value="${esc(saved)}">`;
+      break;
+    case 'number':
+      input=`<input class="input" type="number" name="field_${f.id}" placeholder="${f.placeholder||''}" value="${esc(saved)}">`;
+      break;
+    case 'tel':
+      input=`<input class="input" type="tel" name="field_${f.id}" placeholder="${f.placeholder||''}" value="${esc(saved)}">`;
+      break;
+    case 'password':
+      input=`<input class="input" type="password" name="field_${f.id}" placeholder="${f.placeholder||''}">`;
+      break;
+    case 'textarea':
+      input=`<textarea class="input" name="field_${f.id}" rows="4" placeholder="${f.placeholder||''}">${esc(saved)}</textarea>`;
+      break;
+    case 'select':
+    case 'multi_select':{
+      const opts=(f.options||[]).map(o=>typeof o==='string'?o:o.label||o);
+      const multi=f.field_type==='multi_select'?'multiple':'';
+      input=`<select class="input" name="field_${f.id}" ${multi}><option value="">انتخاب کنید</option>${opts.map(o=>`<option${o===saved?' selected':''}>${o}</option>`).join('')}</select>`;
+      break;}
+    case 'radio':{
+      const opts=(f.options||[]).map(o=>typeof o==='string'?o:o.label||o);
+      input=`<div class="radio-group">${opts.map(o=>`<label><input type="radio" name="field_${f.id}" value="${o}" ${o===saved?'checked':''}>${o}</label>`).join('')}</div>`;
+      break;}
+    case 'checkbox':{
+      const opts=(f.options||[]).map(o=>typeof o==='string'?o:o.label||o);
+      input=`<div class="checkbox-group">${opts.map(o=>`<label><input type="checkbox" name="field_${f.id}" value="${o}">${o}</label>`).join('')}</div>`;
+      break;}
+    case 'toggle':
+      input=`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;font-family:inherit"><input type="checkbox" name="field_${f.id}" value="yes" style="width:20px;height:20px">${f.placeholder||'بله'}</label>`;
+      break;
+    case 'date':
+      input=buildJdp(`field_${f.id}`, saved);
+      break;
+    case 'date_range':
+      input=`<div class="jdp-range">
+        <div><div class="jdp-range-label">از تاریخ</div>${buildJdp(`field_${f.id}_from`, '')}</div>
+        <div><div class="jdp-range-label">تا تاریخ</div>${buildJdp(`field_${f.id}_to`, '')}</div>
+      </div>`;
+      break;
+    case 'time':
+      input=`<input class="input" type="time" name="field_${f.id}" value="${saved}">`;
+      break;
+    case 'datetime':
+      input=`<div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">${buildJdp(`field_${f.id}_date`,saved.split('T')[0]||'')}<input class="input" type="time" name="field_${f.id}_time" value="${saved.split('T')[1]||''}" style="width:120px"></div>`;
+      break;
+    case 'file':
+      input=`<div class="file-drop" onclick="this.querySelector('input').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleFileDrop(event,this,'field_${f.id}')"><input type="file" name="field_${f.id}"><div>📎 فایل را اینجا رها کنید یا کلیک کنید</div><div id="file_${f.id}_name" style="font-size:12px;margin-top:6px;color:#6b7280"></div></div>`;
+      break;
+    case 'image':
+      input=`<div class="file-drop" onclick="this.querySelector('input').click()"><input type="file" name="field_${f.id}" accept="image/*" onchange="previewImg(this)"><div>🖼 تصویر را انتخاب کنید</div><img id="img_${f.id}" style="max-width:100%;max-height:200px;margin-top:8px;display:none"></div>`;
+      break;
+    case 'rating':
+      input=`<div class="rating-group">${[5,4,3,2,1].map(n=>`<input type="radio" name="field_${f.id}" id="r${f.id}_${n}" value="${n}" ${saved==n?'checked':''}><label for="r${f.id}_${n}">★</label>`).join('')}</div>`;
+      break;
+    case 'slider':{
+      const mn=f.validation?.min||0, mx=f.validation?.max||100;
+      input=`<input type="range" class="input" name="field_${f.id}" min="${mn}" max="${mx}" value="${saved||mn}" style="padding:0" oninput="this.nextElementSibling.textContent=this.value"><span style="font-size:13px;color:#6b7280">${saved||mn}</span>`;
+      break;}
+    case 'color':
+      input=`<input type="color" name="field_${f.id}" value="${saved||'#000000'}" style="width:80px;height:40px;border-radius:6px;border:1px solid #d1d5db;cursor:pointer">`;
+      break;
+    case 'section':
+      return `<div style="margin-bottom:20px"><div class="section-title">${f.label}</div>${f.help_text?`<div style="font-size:13px;color:#6b7280;margin-top:4px">${f.help_text}</div>`:''}</div>`;
+    case 'divider':
+      return `<hr class="divider" style="margin:20px 0">`;
+    case 'html':
+      return `<div style="margin-bottom:20px">${f.default_val||''}</div>`;
+    case 'signature':
+      input=`<canvas class="signature-pad" data-sig="field_${f.id}" width="600" height="160" style="max-width:100%"></canvas><input type="hidden" name="field_${f.id}"><button type="button" onclick="clearSig('field_${f.id}')" style="margin-top:4px;background:none;border:1px solid #d1d5db;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:inherit">پاک کردن</button>`;
+      break;
+    case 'map':
+      input=`<div style="border:1px solid #d1d5db;border-radius:8px;padding:16px;text-align:center;color:#6b7280;font-size:13px">📍 انتخاب موقعیت روی نقشه<br><input class="input" name="field_${f.id}" placeholder="عرض جغرافیایی، طول جغرافیایی" value="${esc(saved)}" style="margin-top:8px"></div>`;
+      break;
+    default:
+      input=`<input class="input" type="text" name="field_${f.id}" placeholder="${f.placeholder||f.label}" value="${esc(saved)}">`;
+  }
+  return `<div class="field-wrap" id="fw_${f.id}"><div>${label}</div>${input}${help}<div class="error-msg" id="err_${f.id}"></div></div>`;
+}
+
+function bindEvents(){
+  document.querySelectorAll('[name]').forEach(el=>{
+    if(el.type==='hidden') return; // jdp hidden inputs updated via jdpChange
+    el.addEventListener('change', saveAnswer);
+    el.addEventListener('input',  saveAnswer);
+  });
+}
+
+function saveAnswer(e){
+  const el=e.target, name=el.name;
+  if(el.type==='checkbox'){
+    const vals=[...document.querySelectorAll(`[name="${name}"]:checked`)].map(c=>c.value);
+    answers[name]=vals.join(',');
+  } else if(el.type==='file'){
+    answers[name]=el.files[0]?.name||'';
+    const nameEl=document.getElementById(`${name}_name`);
+    if(nameEl) nameEl.textContent=answers[name];
+  } else {
+    answers[name]=el.value;
+  }
+}
+
+function initSig(canvas){
+  const name=canvas.dataset.sig;
+  let painting=false, lastX, lastY;
+  const ctx=canvas.getContext('2d');
+  ctx.strokeStyle='#0E1B32'; ctx.lineWidth=2; ctx.lineCap='round';
+  const getPos=e=>{ const r=canvas.getBoundingClientRect(), t=e.touches?.[0]||e; return [t.clientX-r.left,t.clientY-r.top]; };
+  canvas.addEventListener('mousedown',  e=>{ painting=true; [lastX,lastY]=getPos(e); });
+  canvas.addEventListener('touchstart', e=>{ e.preventDefault(); painting=true; [lastX,lastY]=getPos(e); },{passive:false});
+  canvas.addEventListener('mousemove',  e=>{ if(!painting)return; draw(e); });
+  canvas.addEventListener('touchmove',  e=>{ e.preventDefault(); if(!painting)return; draw(e); },{passive:false});
+  canvas.addEventListener('mouseup',    ()=>{ painting=false; saveCanvas(name,canvas); });
+  canvas.addEventListener('touchend',   ()=>{ painting=false; saveCanvas(name,canvas); });
+  function draw(e){ const [x,y]=getPos(e); ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke(); [lastX,lastY]=[x,y]; }
+}
+function clearSig(name){ const c=document.querySelector(`[data-sig="${name}"]`); if(!c)return; c.getContext('2d').clearRect(0,0,c.width,c.height); document.querySelector(`[name="${name}"]`).value=''; answers[name]=''; }
+function saveCanvas(name,canvas){ answers[name]=canvas.toDataURL(); document.querySelector(`[name="${name}"]`).value=canvas.toDataURL(); }
+
+function handleFileDrop(e,el,name){ e.preventDefault(); el.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) document.getElementById(`${name}_name`).textContent=f.name; }
+function previewImg(input){ const f=input.files[0]; if(!f)return; const img=document.getElementById(`img_${input.name.replace('field_','')}`); img.src=URL.createObjectURL(f); img.style.display='block'; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function validateStep(){
+  let ok=true;
+  (steps[curStep]?.fields||[]).forEach(f=>{
+    if(!f.required) return;
+    const val=answers[`field_${f.id}`]||'';
+    const errEl=document.getElementById(`err_${f.id}`);
+    const inp=document.querySelector(`[name="field_${f.id}"]`);
+    if(!val){ ok=false; if(errEl) errEl.textContent='این فیلد الزامی است'; if(inp) inp.classList.add('error'); }
+    else { if(errEl) errEl.textContent=''; if(inp) inp.classList.remove('error'); }
+  });
+  return ok;
+}
+
+function nextStep(){ if(!validateStep())return; if(curStep<steps.length-1){ curStep++; renderStep(); window.scrollTo(0,0); } }
+function prevStep(){ if(curStep>0){ curStep--; renderStep(); window.scrollTo(0,0); } }
+
+document.getElementById('mainForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  if(!validateStep()) return;
+  const btn=document.getElementById('btnSubmit');
+  btn.disabled=true; btn.textContent='در حال ارسال…';
+  const payload={...answers};
+  if(formData.restrict_access){ payload.access_national_code=accessNat; payload.access_phone=accessPhone; }
+  const r=await fetch(`/api/public/forms/${SLUG}/submit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json();
+  if(r.ok){
+    document.getElementById('mainForm').style.display='none';
+    document.getElementById('stepIndicator').style.display='none';
+    const sb=document.getElementById('successBox');
+    sb.style.display='block';
+    document.getElementById('successMsg').textContent=d.message||'فرم با موفقیت ثبت شد.';
+  } else {
+    btn.disabled=false; btn.textContent='ثبت فرم';
+    const errDiv=document.createElement('div');
+    errDiv.style.cssText='color:#dc2626;margin-top:8px;font-size:13px;text-align:center';
+    errDiv.textContent=d.error||'خطا در ارسال. دوباره تلاش کنید.';
+    document.querySelector('.btn-group').appendChild(errDiv);
+    setTimeout(()=>errDiv.remove(),5000);
+  }
+});
+
+loadForm();
+</script>
+</body>
+</html>

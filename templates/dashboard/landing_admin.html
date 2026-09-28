@@ -1,0 +1,630 @@
+{% extends "dashboard/layout.html" %}
+{% block head %}
+<style>
+.leader-row { display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border); }
+.leader-row:last-child { border-bottom:none; }
+.leader-avatar { width:56px;height:56px;border-radius:50%;background:var(--bg-alt);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px; }
+.leader-avatar img { width:100%;height:100%;object-fit:cover; }
+.leader-info { flex:1; }
+.leader-name { font-size:13px;font-weight:600;margin-bottom:6px;color:var(--navy); }
+.leader-upload-btn { display:inline-flex;align-items:center;gap:6px;background:var(--bg-alt);padding:7px 12px;border-radius:var(--r);cursor:pointer;font-size:12px;font-weight:600;border:1px dashed var(--border);color:var(--text); }
+.leader-upload-btn input { display:none; }
+
+/* تنظیمات سایت — گرید فشرده به‌جای کارت‌های تک‌ستونی بلند، تا اسکرول صفحه کم شود */
+.settings-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; align-items:start; }
+.settings-card-title { font-size:13.5px; font-weight:700; margin:0 0 10px; color:var(--navy); display:flex; align-items:center; gap:6px; }
+.settings-card-hint { font-size:11.5px; color:var(--muted); margin:0 0 12px; line-height:1.7; }
+.settings-inline-fields { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+.settings-save-bar { margin-top:16px; padding:14px 16px; background:var(--card); border:1px solid var(--border); border-radius:var(--r2); display:flex; align-items:center; justify-content:flex-end; gap:10px; box-shadow:var(--sh-s); }
+@media (max-width: 1100px) {
+  .settings-inline-fields { grid-template-columns:1fr 1fr; }
+}
+@media (max-width: 860px) {
+  .settings-grid { grid-template-columns:1fr; }
+  .settings-grid .card[style*="span 2"] { grid-column:span 1 !important; }
+  .settings-inline-fields { grid-template-columns:1fr; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">مدیریت صفحه عمومی</h1>
+  <a href="/" target="_blank" class="btn btn-ghost btn-sm">مشاهده سایت ↗</a>
+</div>
+<div class="tabs">
+  <button class="tab active" data-pane="slides">اسلایدها</button>
+  <button class="tab" data-pane="projects_pub">پروژه‌های نمایشی</button>
+  <button class="tab" data-pane="settings">تنظیمات سایت</button>
+</div>
+
+<div id="pane-slides" class="tab-pane active">
+  <div style="margin-bottom:12px">
+    <button class="btn btn-gold" id="openSlideModalBtn">
++ اسلاید جدید</button>
+  </div>
+  <div id="slideList" class="stagger"></div>
+</div>
+
+<div id="pane-projects_pub" class="tab-pane">
+  <div class="alert alert-info" style="margin-bottom:16px">
+    پروژه‌های فعال و تکمیل‌شده به‌صورت خودکار در صفحه عمومی نمایش داده می‌شوند.
+    برای مدیریت پروژه‌ها به <a href="/dashboard/projects" style="font-weight:700;color:var(--gold)">بخش پروژه‌ها</a> بروید.
+  </div>
+  <div id="pubProjList" class="stagger"></div>
+</div>
+
+<div id="pane-settings" class="tab-pane">
+  <div class="settings-grid">
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">لوگوی سایت</h3>
+      <p class="settings-card-hint">
+        در هدر پنل، صفحه عمومی و آیکون مرورگر (favicon) استفاده می‌شود.<br>
+        <b>راهنما:</b> PNG با پس‌زمینه شفاف، حداقل ۵۱۲×۵۱۲، مربعی.
+      </p>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="logoPreview" style="width:64px;height:64px;border-radius:14px;background:var(--bg-alt);border:1px solid var(--border);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px">🏢</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label class="leader-upload-btn" style="width:fit-content">📷 انتخاب / تعویض<input type="file" accept="image/*" onchange="uploadSiteLogo(this)"></label>
+          <button class="btn-outline bad btn-sm" style="width:fit-content" onclick="removeSiteLogo()">حذف لوگو</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">اطلاعات پایه سایت</h3>
+      <div class="field"><label>نام هیئت / تعاونی</label><input class="input" id="st_title"></div>
+      <div class="field"><label>زیرعنوان</label><input class="input" id="st_sub"></div>
+      <div class="field"><label>متن دکمه ورود</label><input class="input" id="st_btn"></div>
+      <div class="field"><label>تلفن</label><input class="input" id="st_phone"></div>
+      <div class="field" style="margin-bottom:0"><label>آدرس دفتر</label><input class="input" id="st_addr"></div>
+    </div>
+
+    <div class="card card-p" style="grid-column:span 2">
+      <h3 class="settings-card-title">درباره ما (صفحه عمومی)</h3>
+      <p class="settings-card-hint">متن و تصویر این بخش در صفحه «درباره ما»ی سایت عمومی (/about) نمایش داده می‌شود. آدرس، تلفن و مدیران از کارت‌های «اطلاعات پایه سایت» و «هیئت رئیسه و مدیریت» همین صفحه گرفته می‌شوند.</p>
+      <div class="field"><label>متن درباره ما</label><textarea class="input" id="st_about_text" rows="6" placeholder="معرفی تعاونی، تاریخچه، اهداف و..."></textarea></div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div id="lprev_about_photo" style="width:80px;height:60px;border-radius:10px;background:var(--bg-alt);border:1px solid var(--border);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px">🏢</div>
+        <label class="leader-upload-btn" style="width:fit-content">📷 انتخاب / تعویض تصویر<input type="file" accept="image/*" onchange="uploadLeaderPhoto(this,'about_photo')"></label>
+      </div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">هیئت رئیسه و مدیریت</h3>
+      <div class="field"><label>مدیر اجرایی (طرف اول قرارداد)</label><input class="input" id="st_exec"></div>
+      <div class="field"><label>نماینده هیئت رئیسه</label><input class="input" id="st_board"></div>
+      <div class="field"><label>عنوان هیئت رئیسه</label><input class="input" id="st_board_title"></div>
+      <div class="field"><label>نام عضو سوم هیئت (اختیاری)</label><input class="input" id="st_third_name"></div>
+      <div class="field" style="margin-bottom:0"><label>سمت عضو سوم</label><input class="input" id="st_third_role" placeholder="عضو هیئت رئیسه"></div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        ربات بله
+      </h3>
+      <div class="field"><label>نام کاربری ربات <span style="font-size:12px;color:var(--muted)">(بدون @)</span></label><input class="input" id="st_bale_bot" placeholder="mybot" dir="ltr" autocomplete="off"></div>
+      <div class="field" style="margin-bottom:0">
+        <label>توکن ربات <span style="font-size:12px;color:var(--muted)">(از @BotFather بله دریافت کنید)</span></label>
+        <div style="position:relative">
+          <input class="input" id="st_bale_token" type="password" placeholder="123456789:ABCdef..." dir="ltr" autocomplete="off" style="padding-left:44px">
+          <button type="button" onclick="toggleTokenVis(this)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:4px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.7">
+          ⚠️ اگر توکن را در متغیر محیطی <code style="background:var(--bg);padding:1px 5px;border-radius:4px">BALE_TOKEN</code> تنظیم کرده‌اید، این فیلد را خالی بگذارید.
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">آدرس تحویل مدارک</h3>
+      <p class="settings-card-hint">در فرایند نقل و انتقال به عضو نمایش داده می‌شود.</p>
+      <div class="field" style="margin-bottom:0">
+        <textarea class="input" id="st_docs_addr" rows="3" placeholder="مثال: زنجان، خیابان ...، ساختمان دادگستری، طبقه ...، اتاق ..."></textarea>
+      </div>
+    </div>
+
+    <div class="card card-p" style="grid-column:span 2">
+      <h3 class="settings-card-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        پنل پیامکی (sms.ir)
+      </h3>
+      <div class="settings-inline-fields">
+        <div class="field">
+          <label>کلید API <span style="font-size:12px;color:var(--muted)">(از پنل sms.ir → برنامه‌نویسان)</span></label>
+          <div style="position:relative">
+            <input class="input" id="st_sms_key" type="password" placeholder="کلید API پنل پیامکی" dir="ltr" autocomplete="off" style="padding-left:44px">
+            <button type="button" onclick="toggleVis('st_sms_key', this)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:4px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>شناسه قالب کد تأیید <span style="font-size:12px;color:var(--muted)">(پارامتر CODE)</span></label>
+          <input class="input" id="st_sms_template" placeholder="مثال: 123456" dir="ltr" autocomplete="off">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>شماره خط <span style="font-size:12px;color:var(--muted)">(اختیاری)</span></label>
+          <input class="input" id="st_sms_line" placeholder="مثال: 30007732" dir="ltr" autocomplete="off">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:10px 0;line-height:1.7">
+        ⚠️ کد بازیابی رمز عبور ابتدا با پیامک ارسال می‌شود؛ اگر ناموفق بود از ربات بله استفاده می‌شود.
+      </div>
+      <div class="row-gap" style="margin-bottom:10px;flex-wrap:wrap">
+        <input class="input" id="smsTestMobile" placeholder="موبایل برای تست (مثال: 0912...)" dir="ltr" style="flex:1;min-width:180px">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="testSms(this)">📨 پیامک آزمایشی</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="checkSmsCredit(this)">💰 اعتبار پنل</button>
+      </div>
+      <div id="smsTestResult" style="font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="font-size:11px;color:var(--muted)">برای تست، اول تنظیمات را ذخیره کنید سپس دکمه پیامک آزمایشی را بزنید.</div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">تصاویر مسئولین (صفحه عمومی)</h3>
+      <p class="settings-card-hint">فرمت JPG/PNG، حداکثر ۲ مگابایت، نسبت ۱:۱ توصیه می‌شود.</p>
+      <div style="display:flex;flex-direction:column;gap:0">
+        <div class="leader-row" id="lr_exec_photo">
+          <div class="leader-avatar" id="lprev_exec_photo">👤</div>
+          <div class="leader-info">
+            <div class="leader-name" id="lname_exec_photo">مدیر اجرایی</div>
+            <label class="leader-upload-btn">📷 انتخاب تصویر<input type="file" accept="image/*" onchange="uploadLeaderPhoto(this,'exec_photo')"></label>
+          </div>
+        </div>
+        <div class="leader-row" id="lr_board_photo">
+          <div class="leader-avatar" id="lprev_board_photo">👤</div>
+          <div class="leader-info">
+            <div class="leader-name" id="lname_board_photo">نماینده هیئت رئیسه</div>
+            <label class="leader-upload-btn">📷 انتخاب تصویر<input type="file" accept="image/*" onchange="uploadLeaderPhoto(this,'board_photo')"></label>
+          </div>
+        </div>
+        <div class="leader-row" id="lr_third_photo" style="border-bottom:none">
+          <div class="leader-avatar" id="lprev_third_photo">👤</div>
+          <div class="leader-info">
+            <div class="leader-name" id="lname_third_photo">عضو سوم هیئت</div>
+            <label class="leader-upload-btn">📷 انتخاب تصویر<input type="file" accept="image/*" onchange="uploadLeaderPhoto(this,'third_photo')"></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">تصاویر رهبران (هدر پنل)</h3>
+      <p class="settings-card-hint">تصاویر بالای هر صفحه پنل نمایش داده می‌شوند؛ عنوان هرکس هم قابل ویرایش است.</p>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        {% for i in [1,2,3] %}
+        <div class="leader-row" id="lr_leader{{ i }}_photo" {% if loop.last %}style="border-bottom:none"{% endif %}>
+          <div class="leader-avatar" id="lprev_leader{{ i }}_photo">👤</div>
+          <div class="leader-info" style="flex:1">
+            <input class="input" id="lbl_leader{{ i }}" style="font-size:12px;margin-bottom:6px"
+              placeholder="{% if i==1 %}امام خمینی{% elif i==2 %}شهید رئیسی{% else %}مقام معظم رهبری{% endif %}"
+              onchange="saveLeaderLabel({{ i }},this.value)">
+            <label class="leader-upload-btn">📷 انتخاب تصویر<input type="file" accept="image/*" onchange="uploadLeaderPhoto(this,'leader{{ i }}_photo')"></label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <div class="settings-save-bar">
+    <span style="font-size:12px;color:var(--muted)">تصاویر و لوگو بلافاصله ذخیره می‌شوند — این دکمه فقط برای فیلدهای متنی است</span>
+    <button class="btn btn-navy" onclick="saveSettings(this)">ذخیره تنظیمات</button>
+  </div>
+</div>
+
+<!-- Slide modal -->
+<div class="modal" id="slideModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title">اسلاید جدید</span><button class="modal-x" onclick="modal.close('slideModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>عنوان *</label><input class="input" id="slT"></div>
+      <div class="field"><label>زیرعنوان</label><input class="input" id="slS"></div>
+      <div class="field"><label>رنگ پس‌زمینه</label>
+        <div class="row-gap">
+          <input type="color" id="slCP" value="#1A2640" style="width:44px;height:40px;border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer">
+          <input class="input" id="slC" value="#1A2640">
+        </div>
+      </div>
+
+      <!-- Media upload: image or video -->
+      <div class="field">
+        <label>رسانه اسلایدر — تصویر یا ویدیو (اختیاری)</label>
+
+        <!-- انتخاب نوع رسانه -->
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600">
+            <input type="radio" name="slMediaType" id="slTypeImg" value="image" checked onchange="toggleSlMediaType()">
+            🖼 تصویر
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600">
+            <input type="radio" name="slMediaType" id="slTypeVid" value="video" onchange="toggleSlMediaType()">
+            🎬 ویدیو
+          </label>
+        </div>
+
+        <!-- آپلود تصویر -->
+        <div id="slImgWrap" class="img-upload-wrap">
+          <div class="img-upload-input">
+            <input type="file" id="slImg" accept="image/*" onchange="previewImg(this,'slPreview')">
+            <div class="img-preview-box" id="slPreview">
+              <span style="font-size:28px">🖼</span>
+              <span style="font-size:12px;color:var(--muted)">کلیک کنید</span>
+            </div>
+          </div>
+          <div class="img-guide">
+            <div class="img-guide-title">📐 راهنمای تصویر اسلایدر</div>
+            <ul class="img-guide-list">
+              <li><b>سایز ایده‌آل:</b> <code>1920 × 900</code> پیکسل</li>
+              <li><b>حداقل:</b> <code>1280 × 600</code> پیکسل</li>
+              <li><b>فرمت:</b> JPG یا WebP</li>
+              <li><b>حجم:</b> حداکثر ۵۰۰ کیلوبایت</li>
+            </ul>
+            <div class="img-guide-tips">
+              <div class="img-guide-tip tip-do">✓ موضوع اصلی را وسط یا پایین قرار بده</div>
+              <div class="img-guide-tip tip-do">✓ تصویر باید نسبتاً تیره باشد</div>
+              <div class="img-guide-tip tip-dont">✗ تصویر روشن نگذار — متن ناخوانا می‌شود</div>
+            </div>
+            <a href="https://squoosh.app" target="_blank" class="img-guide-link">🔗 فشرده‌سازی در squoosh.app</a>
+          </div>
+        </div>
+
+        <!-- آپلود ویدیو -->
+        <div id="slVidWrap" style="display:none">
+          <div class="img-upload-wrap">
+            <div class="img-upload-input">
+              <input type="file" id="slVid" accept="video/mp4,video/webm" onchange="previewVideo(this,'slVidPreview')">
+              <div class="img-preview-box" id="slVidPreview" style="height:120px">
+                <span style="font-size:28px">🎬</span>
+                <span style="font-size:12px;color:var(--muted)">MP4 یا WebM</span>
+              </div>
+            </div>
+            <div class="img-guide">
+              <div class="img-guide-title">🎬 راهنمای ویدیو اسلایدر</div>
+              <ul class="img-guide-list">
+                <li><b>رزولوشن:</b> <code>1920 × 1080</code> یا <code>1280 × 720</code></li>
+                <li><b>فرمت:</b> MP4 (H.264) یا WebM</li>
+                <li><b>حجم:</b> حداکثر <code>20 MB</code></li>
+                <li><b>مدت:</b> ترجیحاً ۱۰ تا ۳۰ ثانیه</li>
+              </ul>
+              <div class="img-guide-tips">
+                <div class="img-guide-tip tip-do">✓ ویدیو بدون صدا توصیه می‌شود (autoplay)</div>
+                <div class="img-guide-tip tip-do">✓ فیلم حرکت آرام و ملایم مناسب‌تر است</div>
+                <div class="img-guide-tip tip-dont">✗ ویدیو با فلاش یا حرکت سریع نگذار</div>
+                <div class="img-guide-tip tip-dont">✗ حجم بالا سرعت سایت را کاهش می‌دهد</div>
+              </div>
+              <a href="https://www.handbrake.fr" target="_blank" class="img-guide-link">🔗 فشرده‌سازی با HandBrake (رایگان)</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field"><label>ترتیب</label><input class="input" type="number" id="slO" value="0"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="addSlide(this)">افزودن اسلاید</button>
+      <button class="btn btn-ghost" onclick="modal.close('slideModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var b = document.getElementById('openSlideModalBtn');
+  if (b) b.addEventListener('click', function() {
+    resetSlideModal();
+    var m = document.getElementById('slideModal');
+    if (m) m.classList.add('open');
+  });
+});
+</script>
+<script>
+
+function previewImg(input, previewId) {
+  const file = input.files[0];
+  const box = document.getElementById(previewId);
+  if (!file || !box) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    box.style.backgroundImage = 'url(' + e.target.result + ')';
+    box.style.backgroundSize = 'cover';
+    box.style.backgroundPosition = 'center';
+    box.innerHTML = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('slCP').oninput = e => document.getElementById('slC').value = e.target.value;
+
+function toggleSlMediaType() {
+  const isVideo = document.getElementById('slTypeVid').checked;
+  document.getElementById('slImgWrap').style.display = isVideo ? 'none' : '';
+  document.getElementById('slVidWrap').style.display = isVideo ? '' : 'none';
+}
+
+function previewVideo(input, previewId) {
+  const file = input.files[0];
+  const box = document.getElementById(previewId);
+  if (!file || !box) return;
+  const url = URL.createObjectURL(file);
+  box.innerHTML = `<video src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" muted playsinline autoplay loop></video>`;
+}
+document.getElementById('slC').oninput = e => document.getElementById('slCP').value = e.target.value;
+
+var allSlides = [];
+var editingSlideId = null;
+
+async function loadSlides() {
+  const { slides } = await fetch('/api/admin/slides').then(r => r.json());
+  allSlides = slides;
+  document.getElementById('slideList').innerHTML = slides.length
+    ? slides.map(s => `
+      <div class="list-row">
+        <div class="list-color" style="background:${s.bg_color};${s.image_path?'background-image:url(/uploads/'+s.image_path+');background-size:cover':''}">${s.media_type==='video'?'🎬':''}</div>
+        <div class="list-body">
+          <b>${s.title}</b>
+          ${s.subtitle ? '<br><small style="color:var(--muted)">'+s.subtitle+'</small>' : ''}
+          <br><small style="color:var(--muted)">ترتیب: ${s.order}</small>
+        </div>
+        <div class="list-actions">
+          <button class="badge ${s.active?'b-ok':'b-off'}" style="border:none;cursor:pointer" onclick="toggleSlide(${s.id})" title="تغییر وضعیت نمایش">${s.active?'نمایش':'پنهان'}</button>
+          <button class="btn-outline" onclick="openEditSlide(${s.id})">ویرایش</button>
+          <button class="btn-outline bad" onclick="delSlide(${s.id}, this)">حذف</button>
+        </div>
+      </div>`).join('')
+    : '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>اسلایدی ثبت نشده</div>';
+}
+
+function resetSlideModal() {
+  editingSlideId = null;
+  document.querySelector('#slideModal .modal-title').textContent = 'اسلاید جدید';
+  document.querySelector('#slideModal .modal-foot .btn-navy').textContent = 'افزودن اسلاید';
+  document.getElementById('slT').value = '';
+  document.getElementById('slS').value = '';
+  document.getElementById('slC').value = '#1A2640';
+  document.getElementById('slCP').value = '#1A2640';
+  document.getElementById('slO').value = '0';
+  document.getElementById('slImg').value = '';
+  document.getElementById('slVid').value = '';
+  document.getElementById('slTypeImg').checked = true;
+  toggleSlMediaType();
+  document.getElementById('slPreview').innerHTML = '<span style="font-size:28px">🖼</span><span style="font-size:12px;color:var(--muted)">کلیک کنید</span>';
+  document.getElementById('slVidPreview').innerHTML = '<span style="font-size:28px">🎬</span><span style="font-size:12px;color:var(--muted)">MP4 یا WebM</span>';
+}
+
+function openEditSlide(id) {
+  const s = allSlides.find(x => x.id === id);
+  if (!s) return;
+  resetSlideModal();
+  editingSlideId = id;
+  document.querySelector('#slideModal .modal-title').textContent = 'ویرایش اسلاید';
+  document.querySelector('#slideModal .modal-foot .btn-navy').textContent = 'ذخیره تغییرات';
+  document.getElementById('slT').value = s.title || '';
+  document.getElementById('slS').value = s.subtitle || '';
+  document.getElementById('slC').value = s.bg_color || '#1A2640';
+  document.getElementById('slCP').value = s.bg_color || '#1A2640';
+  document.getElementById('slO').value = s.order || 0;
+  if (s.media_type === 'video') {
+    document.getElementById('slTypeVid').checked = true;
+    toggleSlMediaType();
+    if (s.video_path)
+      document.getElementById('slVidPreview').innerHTML = '<video src="/uploads/'+s.video_path+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" muted playsinline autoplay loop></video>';
+  } else if (s.image_path) {
+    document.getElementById('slPreview').innerHTML = '<img src="/uploads/'+s.image_path+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">';
+  }
+  modal.open('slideModal');
+}
+
+async function toggleSlide(id) {
+  const r = await fetch('/api/admin/slides/'+id+'/toggle', {method:'POST'});
+  if (r.ok) loadSlides();
+  else toast('خطا در تغییر وضعیت', 'warn');
+}
+
+window.addSlide = async function(btn) {
+  btnLoading(btn, true);
+  const fd = new FormData();
+  fd.append('title', $v('slT')); fd.append('subtitle', $v('slS'));
+  fd.append('bg_color', $v('slC')); fd.append('order', $v('slO'));
+  const isVideo = document.getElementById('slTypeVid').checked;
+  if (isVideo) {
+    const vid = document.getElementById('slVid').files[0];
+    if (vid) fd.append('video', vid);
+  } else {
+    const img = document.getElementById('slImg').files[0];
+    if (img) fd.append('image', img);
+  }
+  const url = editingSlideId ? '/api/admin/slides/' + editingSlideId : '/api/admin/slides';
+  const r = await fetch(url, {method:'POST', body:fd});
+  btnLoading(btn, false);
+  if (r.ok) {
+    modal.close('slideModal');
+    toast(editingSlideId ? 'اسلاید ویرایش شد' : 'اسلاید اضافه شد');
+    resetSlideModal();
+    loadSlides();
+  } else {
+    let msg = 'خطا در ذخیره اسلاید';
+    try { const d = await r.json(); if (d.error) msg = d.error; } catch(e) {}
+    toast(msg, 'warn');
+  }
+}
+async function delSlide(id, btn) {
+  if (!await confirmAction('اسلاید حذف شود؟')) return;
+  btnLoading(btn, true);
+  await fetch('/api/admin/slides/'+id+'/delete', {method:'POST'});
+  loadSlides();
+}
+
+async function loadPubProjects() {
+  const { projects } = await fetch('/api/projects').then(r => r.json());
+  const stLbl = {active:'در حال اجرا', completed:'تکمیل‌شده', upcoming:'آینده'};
+  document.getElementById('pubProjList').innerHTML = projects.filter(p=>p.active).map(p => `
+    <div class="list-row">
+      <div class="list-body"><b>${p.name}</b><br><small style="color:var(--muted)">${stLbl[p.status]||p.status}${p.address?' — '+p.address:''}</small></div>
+      <span class="badge b-ok">نمایش داده می‌شود</span>
+    </div>`).join('') || '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>پروژه فعالی ثبت نشده</div>';
+}
+
+async function loadSettings() {
+  const d = await fetch('/api/admin/settings').then(r => r.json());
+  document.getElementById('st_title').value       = d.site_title || '';
+  document.getElementById('st_sub').value         = d.site_subtitle || '';
+  document.getElementById('st_btn').value         = d.hero_btn_label || '';
+  document.getElementById('st_phone').value       = d.site_phone || '';
+  document.getElementById('st_addr').value        = d.site_address || '';
+  document.getElementById('st_exec').value        = d.exec_manager || '';
+  document.getElementById('st_board').value       = d.board_rep || '';
+  document.getElementById('st_board_title').value = d.board_title || '';
+  document.getElementById('st_third_name').value  = d.third_name || '';
+  document.getElementById('st_third_role').value  = d.third_role || '';
+  document.getElementById('st_bale_bot').value     = d.bale_bot_username || '';
+  if (d.bale_bot_token) document.getElementById('st_bale_token').placeholder = '••••••• (تنظیم شده)';
+  if (d.sms_api_key)    document.getElementById('st_sms_key').placeholder    = '••••••• (تنظیم شده)';
+  document.getElementById('st_sms_template').value = d.sms_template_id || '';
+  document.getElementById('st_sms_line').value     = d.sms_line_number || '';
+  document.getElementById('st_docs_addr').value    = d.transfer_docs_address || '';
+  document.getElementById('st_about_text').value   = d.about_text || '';
+  ['exec_photo','board_photo','third_photo','leader1_photo','leader2_photo','leader3_photo'].forEach(key => {
+    if (d[key]) {
+      const prev = document.getElementById('lprev_' + key);
+      if (prev) prev.innerHTML = `<img src="/uploads/${d[key]}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    }
+  });
+  const aboutPrev = document.getElementById('lprev_about_photo');
+  if (aboutPrev && d.about_photo) aboutPrev.innerHTML = `<img src="/uploads/${d.about_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`;
+  const logoPrev = document.getElementById('logoPreview');
+  if (logoPrev) logoPrev.innerHTML = d.site_logo
+    ? `<img src="/uploads/${d.site_logo}" style="width:100%;height:100%;object-fit:contain">`
+    : '🏢';
+  [1,2,3].forEach(i => {
+    const lbl = document.getElementById('lbl_leader'+i);
+    if (lbl && d['leader'+i+'_label']) lbl.value = d['leader'+i+'_label'];
+  });
+}
+function toggleTokenVis(btn) {
+  var inp = document.getElementById('st_bale_token');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+function toggleVis(id, btn) {
+  var inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+window.saveSettings = async function(btn) {
+  btnLoading(btn, true);
+  try {
+    const r = await fetch('/api/admin/settings', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        site_title:$v('st_title'), site_subtitle:$v('st_sub'), hero_btn_label:$v('st_btn'),
+        site_phone:$v('st_phone'), site_address:$v('st_addr'),
+        exec_manager:$v('st_exec'), board_rep:$v('st_board'), board_title:$v('st_board_title'),
+        third_name:$v('st_third_name'), third_role:$v('st_third_role'),
+        bale_bot_username:$v('st_bale_bot'),
+        ...($v('st_bale_token') ? {bale_bot_token:$v('st_bale_token')} : {}),
+        sms_template_id:$v('st_sms_template'), sms_line_number:$v('st_sms_line'),
+        transfer_docs_address:$v('st_docs_addr'), about_text:$v('st_about_text'),
+        ...($v('st_sms_key') ? {sms_api_key:$v('st_sms_key')} : {}),
+      })
+    });
+    btnLoading(btn, false);
+    if (r.ok) {
+      toast('تنظیمات ذخیره شد');
+    } else {
+      let msg = 'خطا در ذخیره تنظیمات';
+      try { const d = await r.json(); if (d.error) msg = d.error; } catch(e) {}
+      if (r.status === 400 && msg.indexOf('CSRF') !== -1) msg = 'نشست شما منقضی شده — صفحه را رفرش کنید و دوباره تلاش کنید.';
+      toast(msg, 'warn');
+    }
+  } catch (e) {
+    btnLoading(btn, false);
+    toast('خطا در ارتباط با سرور', 'warn');
+  }
+}
+
+async function testSms(btn) {
+  var box = document.getElementById('smsTestResult');
+  var mobile = document.getElementById('smsTestMobile').value.trim();
+  btnLoading(btn, true);
+  try {
+    const r = await fetch('/api/admin/sms/test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mobile:mobile})});
+    const d = await r.json();
+    box.style.display=''; box.style.color = r.ok ? 'var(--ok)' : 'var(--bad)';
+    box.textContent = r.ok ? ('✅ ' + (d.message||'ارسال شد')) : ('❌ ' + (d.error||'خطا'));
+  } catch(e){ box.style.display=''; box.style.color='var(--bad)'; box.textContent='❌ خطا در ارتباط با سرور'; }
+  btnLoading(btn, false);
+}
+async function checkSmsCredit(btn) {
+  var box = document.getElementById('smsTestResult');
+  btnLoading(btn, true);
+  try {
+    const r = await fetch('/api/admin/sms/credit');
+    const d = await r.json();
+    box.style.display=''; box.style.color = r.ok ? 'var(--navy)' : 'var(--bad)';
+    box.textContent = r.ok ? ('💰 اعتبار باقی‌مانده: ' + d.credit) : ('❌ ' + (d.error||'خطا'));
+  } catch(e){ box.style.display=''; box.style.color='var(--bad)'; box.textContent='❌ خطا در ارتباط با سرور'; }
+  btnLoading(btn, false);
+}
+
+async function uploadLeaderPhoto(input, key) {
+  if (!input.files[0]) return;
+  const fd = new FormData();
+  fd.append('photo', input.files[0]);
+  fd.append('key', key);
+  const r = await fetch('/api/admin/leader-photo', {method:'POST', body:fd});
+  const d = await r.json();
+  if (d.ok) {
+    const prev = document.getElementById('lprev_' + key);
+    const radius = key === 'about_photo' ? '8px' : '50%';
+    if (prev) prev.innerHTML = `<img src="/uploads/${d.path}" style="width:100%;height:100%;object-fit:cover;border-radius:${radius}">`;
+    toast('تصویر آپلود شد.', 'success');
+  } else {
+    toast(d.error || 'خطا در آپلود', 'error');
+  }
+}
+
+async function uploadSiteLogo(input) {
+  if (!input.files[0]) return;
+  const fd = new FormData();
+  fd.append('photo', input.files[0]);
+  fd.append('key', 'site_logo');
+  const r = await fetch('/api/admin/leader-photo', {method:'POST', body:fd});
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById('logoPreview').innerHTML = `<img src="/uploads/${d.path}" style="width:100%;height:100%;object-fit:contain">`;
+    toast('لوگو آپلود شد — صفحه را رفرش کنید تا در همه‌جا نمایش داده شود.', 'success');
+  } else {
+    toast(d.error || 'خطا در آپلود', 'error');
+  }
+}
+
+window.removeSiteLogo = async function() {
+  if (!await confirmAction('لوگوی سایت حذف شود؟')) return;
+  await fetch('/api/admin/settings', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({site_logo: ''})});
+  document.getElementById('logoPreview').innerHTML = '🏢';
+  toast('لوگو حذف شد');
+};
+
+window.saveLeaderLabel = async function(i, val) {
+  const key = 'leader' + i + '_label';
+  await fetch('/api/admin/settings', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({[key]: val})});
+  toast('عنوان ذخیره شد');
+};
+
+/* initTabs() نیازی به فراخوانی دستی ندارد — app.js آن را خودکار روی
+   DOMContentLoaded برای هر .tabs از جمله همین صفحه اجرا می‌کند. فراخوانی
+   دستی‌اش اینجا چون این اسکریپت این‌لاین (بدون defer) زودتر از اجرای
+   app.js (که defer دارد) اجرا می‌شد، با خطای «initTabs is not defined»
+   متوقف می‌شد و همین باعث می‌شد loadSlides/loadPubProjects/loadSettings
+   بعد از آن هم هرگز اجرا نشوند — یعنی اسلایدهای موجود نمایش داده نمی‌شدند. */
+loadSlides(); loadPubProjects(); loadSettings();
+</script>
+{% endblock %}

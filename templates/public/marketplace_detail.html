@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _desc  = (listing.description or '')[:150] or (listing.title ~ ' — ' ~ "{:,}".format(listing.price) ~ ' تومان') %}
+  {% set _url   = request.url_root.rstrip('/') + '/marketplace/' + listing.slug %}
+  <title>{{ listing.title }} — بازار خرید و فروش دفترچه‌ها | {{ _title }}</title>
+  <meta name="description" content="{{ _desc }}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{{ _url }}">
+  <meta property="og:type" content="product">
+  <meta property="og:locale" content="fa_IR">
+  <meta property="og:url" content="{{ _url }}">
+  <meta property="og:title" content="{{ listing.title }}">
+  <meta property="og:description" content="{{ _desc }}">
+  {% if settings.get('site_logo') %}
+  <link rel="apple-touch-icon" href="/uploads/{{ settings.site_logo }}">
+  <link rel="icon" type="image/png" href="/uploads/{{ settings.site_logo }}">
+  {% else %}
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  {% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/public.css?v={{ app_version }}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": {{ listing.title|tojson }},
+    "description": {{ _desc|tojson }},
+    "sku": {{ listing.code|tojson }},
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "IRR",
+      "price": {{ (listing.price * 10)|tojson }},
+      "availability": "https://schema.org/InStock",
+      "url": {{ _url|tojson }}
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": {{ _title|tojson }}, "item": {{ (request.url_root.rstrip('/') ~ '/')|tojson }} },
+      {"@type": "ListItem", "position": 2, "name": "بازار خرید و فروش دفترچه‌ها", "item": {{ (request.url_root.rstrip('/') ~ '/marketplace')|tojson }} },
+      {"@type": "ListItem", "position": 3, "name": {{ listing.title|tojson }}, "item": {{ _url|tojson }} }
+    ]
+  }
+  </script>
+  <style>
+    .det-hero {
+      background: linear-gradient(160deg, #12172B 0%, #1E2545 60%, #15213A 100%);
+      padding: 130px 20px 40px;
+    }
+    .det-hero-inner { max-width: 900px; margin: 0 auto; }
+    .det-crumb { font-size: 12.5px; color: rgba(230,228,220,.55); margin-bottom: 14px; }
+    .det-crumb a { color: rgba(230,228,220,.75); text-decoration: none; }
+    .det-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(184,146,90,.18); border: 1px solid rgba(184,146,90,.4);
+      color: var(--p-gold-h); font-size: 12px; font-weight: 700;
+      padding: 4px 12px; border-radius: 999px; margin-bottom: 14px;
+    }
+    .det-title { font-size: clamp(22px,3.5vw,32px); font-weight: 800; color: #F5F1E6; margin-bottom: 8px; }
+    .det-code { font-size: 12px; color: rgba(230,228,220,.5); font-family: monospace; }
+
+    .det-body { max-width: 900px; margin: -30px auto 90px; padding: 0 20px; position: relative; z-index: 5; }
+    .det-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 22px; align-items: start; }
+    @media (max-width: 760px) { .det-grid { grid-template-columns: 1fr; } }
+
+    .det-card {
+      background: var(--p-card); border: 1px solid var(--p-border); border-radius: var(--p-r2);
+      padding: 24px 26px; box-shadow: var(--p-sh-m); margin-bottom: 20px;
+    }
+    .det-price { font-size: 26px; font-weight: 900; color: var(--p-gold-deep); margin-bottom: 6px; }
+    .det-facts { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; margin: 18px 0; }
+    .det-fact-label { font-size: 11.5px; color: var(--p-muted); margin-bottom: 3px; }
+    .det-fact-val { font-size: 14px; font-weight: 700; color: var(--p-text); }
+    .det-section-h { font-size: 13px; font-weight: 800; color: var(--p-text); margin: 18px 0 8px; }
+    .det-desc { font-size: 14px; line-height: 2; color: var(--p-text2); white-space: pre-line; }
+
+    .contact-box-title { font-size: 14.5px; font-weight: 800; margin-bottom: 14px; }
+    .contact-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 13px; border-radius: var(--p-r); font-size: 14px; font-weight: 700;
+      text-decoration: none; margin-bottom: 10px; border: none; cursor: pointer; font-family: inherit;
+    }
+    .contact-btn.call { background: var(--p-navy); color: #fff; }
+    .contact-btn.request { background: var(--p-gold); color: #1A1200; }
+    .contact-note { font-size: 12px; color: var(--p-muted); text-align: center; }
+
+    .req-modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(10,15,25,.6);
+      z-index: 200; align-items: center; justify-content: center; padding: 20px;
+    }
+    .req-modal-overlay.open { display: flex; }
+    .req-modal {
+      background: var(--p-card); border-radius: var(--p-r2); padding: 26px; max-width: 420px; width: 100%;
+      box-shadow: var(--p-sh-l);
+    }
+    .req-modal h3 { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+    .req-modal p { font-size: 12.5px; color: var(--p-muted); margin-bottom: 16px; }
+    .req-field { margin-bottom: 12px; }
+    .req-field label { display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 5px; }
+    .req-field input, .req-field textarea {
+      width: 100%; font-family: inherit; font-size: 13.5px; padding: 10px 12px;
+      border: 1.5px solid var(--p-border); border-radius: var(--p-r); background: var(--p-bg); color: var(--p-text);
+    }
+    .req-field textarea { resize: vertical; min-height: 70px; }
+    .req-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .req-modal-actions button { flex: 1; padding: 11px; border-radius: var(--p-r); font-size: 13.5px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; }
+    .req-modal-actions .primary { background: var(--p-gold); color: #1A1200; }
+    .req-modal-actions .ghost { background: var(--p-bg); color: var(--p-text2); border: 1px solid var(--p-border); }
+    #reqMsg { font-size: 12.5px; margin-top: 10px; display: none; padding: 8px 10px; border-radius: 8px; }
+    #reqMsg.ok  { background: rgba(34,197,94,.1); color: #16a34a; display: block; }
+    #reqMsg.err { background: rgba(239,68,68,.1); color: #dc2626; display: block; }
+  </style>
+</head>
+<body class="pub">
+
+<div class="pub-nav-wrap">
+  <nav class="pub-nav liquid-glass">
+    <div class="pub-nav-inner">
+      <a href="/" class="pub-nav-brand" style="text-decoration:none">
+        <div class="pub-nav-logo">
+          {% if settings.get('site_logo') %}
+          <img src="/uploads/{{ settings.site_logo }}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">
+          {% else %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+          {% endif %}
+        </div>
+        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+      </a>
+      <div class="pub-nav-links">
+        <a href="/marketplace" class="pub-nav-link" style="color:var(--p-gold)">بازار خرید و فروش</a>
+      </div>
+      <a href="/login" class="pub-nav-btn">ورود اعضا</a>
+    </div>
+  </nav>
+</div>
+
+<section class="det-hero">
+  <div class="det-hero-inner">
+    <div class="det-crumb"><a href="/marketplace">بازار خرید و فروش</a> ← {{ listing.title }}</div>
+    <div class="det-badge">✓ تأیید شده توسط تعاونی</div>
+    <h1 class="det-title">{{ listing.title }}</h1>
+    <div class="det-code">کد آگهی: {{ listing.code }}</div>
+  </div>
+</section>
+
+<div class="det-body">
+  <div class="det-grid">
+    <div>
+      <div class="det-card">
+        <div class="det-price">{{ "{:,}".format(listing.price) }} تومان</div>
+        <div style="font-size:12.5px;color:var(--p-muted)">{{ 'قابل مذاکره' if listing.negotiable else 'قیمت غیرقابل مذاکره' }}</div>
+
+        <div class="det-facts">
+          {% if listing.project %}<div><div class="det-fact-label">پروژه</div><div class="det-fact-val">{{ listing.project.name }}</div></div>{% endif %}
+          {% if listing.unit_type %}<div><div class="det-fact-label">نوع دفترچه/امتیاز</div><div class="det-fact-val">{{ listing.unit_type }}</div></div>{% endif %}
+          {% if listing.area %}<div><div class="det-fact-label">متراژ</div><div class="det-fact-val">{{ listing.area }} متر</div></div>{% endif %}
+          <div><div class="det-fact-label">تاریخ انتشار</div><div class="det-fact-val">{{ listing.published_at.strftime('%Y/%m/%d') if listing.published_at else '—' }}</div></div>
+        </div>
+
+        {% if listing.sale_terms %}
+        <div class="det-section-h">شرایط فروش</div>
+        <div class="det-desc">{{ listing.sale_terms }}</div>
+        {% endif %}
+
+        {% if listing.description %}
+        <div class="det-section-h">توضیحات</div>
+        <div class="det-desc">{{ listing.description }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div>
+      <div class="det-card">
+        <div class="contact-box-title">راه ارتباط با فروشنده</div>
+        {% if listing.contact_method in ('phone','both') and listing.contact_phone %}
+        <a class="contact-btn call" href="tel:{{ listing.contact_phone }}">
+          📞 تماس با فروشنده — {{ listing.contact_phone }}
+        </a>
+        {% endif %}
+        {% if listing.contact_method in ('request','both') %}
+        <button class="contact-btn request" onclick="openReqModal()">✉️ درخواست خرید</button>
+        {% endif %}
+        <div class="contact-note">تماس/معامله مستقیم بین خریدار و فروشنده انجام می‌شود؛ تعاونی فقط آگهی را تأیید و منتشر کرده است.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if listing.contact_method in ('request','both') %}
+<div class="req-modal-overlay" id="reqOverlay" onclick="if(event.target===this)closeReqModal()">
+  <div class="req-modal">
+    <h3>درخواست خرید</h3>
+    <p>اطلاعات شما فقط برای فروشنده و تعاونی ارسال می‌شود.</p>
+    <div class="req-field"><label>نام و نام خانوادگی</label><input id="reqName" placeholder="نام شما"></div>
+    <div class="req-field"><label>شماره موبایل</label><input id="reqPhone" inputmode="numeric" maxlength="11" placeholder="09xxxxxxxxx" dir="ltr"></div>
+    <div class="req-field"><label>پیام (اختیاری)</label><textarea id="reqMessage" placeholder="پیام شما برای فروشنده…"></textarea></div>
+    <div id="reqMsg"></div>
+    <div class="req-modal-actions">
+      <button class="ghost" onclick="closeReqModal()">انصراف</button>
+      <button class="primary" onclick="submitReq(this)">ارسال درخواست</button>
+    </div>
+  </div>
+</div>
+<script>
+function openReqModal(){ document.getElementById('reqOverlay').classList.add('open'); }
+function closeReqModal(){ document.getElementById('reqOverlay').classList.remove('open'); }
+function submitReq(btn){
+  var msgEl = document.getElementById('reqMsg');
+  var name = document.getElementById('reqName').value.trim();
+  var phone = document.getElementById('reqPhone').value.trim();
+  var message = document.getElementById('reqMessage').value.trim();
+  if(!name || !phone){
+    msgEl.className='err'; msgEl.textContent='نام و شماره موبایل الزامی است.'; return;
+  }
+  btn.disabled = true; btn.textContent = 'در حال ارسال…';
+  fetch('/api/marketplace/listings/{{ listing.id }}/purchase-request', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({buyer_name:name, buyer_phone:phone, message:message})
+  }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+    .then(function(x){
+      btn.disabled = false; btn.textContent = 'ارسال درخواست';
+      if(!x.ok){ msgEl.className='err'; msgEl.textContent = x.d.error || 'خطا در ارسال درخواست'; return; }
+      msgEl.className='ok'; msgEl.textContent = 'درخواست شما با موفقیت ارسال شد. فروشنده به‌زودی با شما تماس می‌گیرد.';
+      document.getElementById('reqName').value='';
+      document.getElementById('reqPhone').value='';
+      document.getElementById('reqMessage').value='';
+    })
+    .catch(function(){
+      btn.disabled = false; btn.textContent = 'ارسال درخواست';
+      msgEl.className='err'; msgEl.textContent = 'خطا در ارتباط با سرور';
+    });
+}
+</script>
+{% endif %}
+
+<footer class="pub-footer">
+  <div class="pub-container">
+    <div class="footer-copy">
+      تمامی حقوق مادی و معنوی این سامانه محفوظ و متعلق به <a href="https://Noyan.team" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline"><strong>نویان فناور آریا</strong></a> است.
+      <span style="opacity:.6;font-size:11px;margin-right:8px">نسخه {{ app_version }}</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

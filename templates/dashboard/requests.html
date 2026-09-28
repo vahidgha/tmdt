@@ -1,0 +1,354 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">{% if user.role == 'admin' %}درخواست‌های نقل و انتقال{% else %}درخواست‌های من{% endif %}</h1>
+</div>
+
+{% if user.role == 'member' %}
+<div class="alert alert-info" style="margin-bottom:16px">
+  برای ثبت درخواست نقل و انتقال، به بخش <a href="/dashboard/booklet" style="font-weight:700">دفترچه‌های من</a> بروید و روی دفترچه موردنظر دکمه «درخواست نقل و انتقال» را بزنید.
+</div>
+{% endif %}
+
+{% if user.role == 'member' %}
+<div class="req-steps">
+  <div class="req-step"><div class="req-step-num">۱</div><div class="req-step-body"><div class="req-step-title">ثبت درخواست</div><div class="req-step-desc">مشخصات مالک جدید را وارد کنید</div></div></div>
+  <div class="req-step-arrow">←</div>
+  <div class="req-step"><div class="req-step-num">۲</div><div class="req-step-body"><div class="req-step-title">بررسی مدیر</div><div class="req-step-desc">هیئت امنا درخواست را بررسی می‌کند</div></div></div>
+  <div class="req-step-arrow">←</div>
+  <div class="req-step"><div class="req-step-num">۳</div><div class="req-step-body"><div class="req-step-title">تحویل مدارک</div><div class="req-step-desc">اصل مدارک را حضوری تحویل دهید</div></div></div>
+  <div class="req-step-arrow">←</div>
+  <div class="req-step"><div class="req-step-num">۴</div><div class="req-step-body"><div class="req-step-title">تأیید نهایی</div><div class="req-step-desc">دفترچه به مالک جدید منتقل می‌شود</div></div></div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:16px">
+  <div style="padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input class="input" id="fSearch" placeholder="جستجو مالک جدید، کد ملی، کد دفترچه…" oninput="searchChanged()" style="flex:1;min-width:180px">
+    <select class="input" id="fStatus" onchange="load()" style="max-width:190px">
+      <option value="">همه وضعیت‌ها</option>
+      <option value="pending">در انتظار بررسی</option>
+      <option value="awaiting_docs">در انتظار دریافت مدارک</option>
+      <option value="approved">تأیید نهایی شده</option>
+      <option value="rejected">رد شده</option>
+    </select>
+    {% if user.role == 'admin' %}
+    <select class="input" id="fProject" onchange="load()" style="max-width:190px"><option value="">همه پروژه‌ها</option></select>
+    {% endif %}
+  </div>
+</div>
+
+<div id="reqList"></div>
+
+
+<!-- Modal جزئیات کامل + مدارک + تایید/رد -->
+<div class="modal" id="detailModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-head">
+      <span class="modal-title">جزئیات درخواست نقل و انتقال</span>
+      <button class="modal-x" onclick="modal.close('detailModal')">×</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-foot" id="detailFoot">
+      <button class="btn btn-ghost" onclick="modal.close('detailModal')">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تأیید با توضیح -->
+<div class="modal" id="approveModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-head"><span class="modal-title">تأیید درخواست</span><button class="modal-x" onclick="modal.close('approveModal')">×</button></div>
+    <div class="modal-body">
+      <div class="alert alert-info" style="margin-bottom:12px">با تأیید اولیه، درخواست به مرحله «دریافت حضوری مدارک» می‌رود و آدرس تحویل به عضو اطلاع‌رسانی می‌شود. انتقال نهایی پس از دریافت مدارک انجام خواهد شد.</div>
+      <div class="field"><label>توضیحات مدیر (اختیاری)</label><textarea class="input" id="approveNote" rows="3" placeholder="مثلاً: مدارک آنلاین کامل بود…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="doApprove(this)">✓ تأیید اولیه</button>
+      <button class="btn btn-ghost" onclick="modal.close('approveModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تأیید نهایی (دریافت مدارک) -->
+<div class="modal" id="completeModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-head"><span class="modal-title">تأیید نهایی — دریافت مدارک</span><button class="modal-x" onclick="modal.close('completeModal')">×</button></div>
+    <div class="modal-body">
+      <div class="alert alert-info" style="margin-bottom:12px">با تأیید نهایی، دفترچه به مالک جدید منتقل می‌شود. فقط در صورتی تأیید کنید که اصل مدارک حضوری دریافت شده باشد.</div>
+      <div class="field"><label>توضیحات (اختیاری)</label><textarea class="input" id="completeNote" rows="3" placeholder="مثلاً: اصل مدارک دریافت شد…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" onclick="doComplete(this)">📄 مدارک دریافت شد — انتقال نهایی</button>
+      <button class="btn btn-ghost" onclick="modal.close('completeModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal رد با دلیل -->
+<div class="modal" id="rejectModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-head"><span class="modal-title">رد درخواست</span><button class="modal-x" onclick="modal.close('rejectModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>دلیل رد *</label><textarea class="input" id="rejectNote" rows="4" placeholder="دلیل رد را بنویسید…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-bad" onclick="doReject(this)">رد درخواست</button>
+      <button class="btn btn-ghost" onclick="modal.close('rejectModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var statusLabel={approved:'تأیید نهایی شده',rejected:'رد شده',pending:'در انتظار بررسی',awaiting_docs:'در انتظار دریافت مدارک'};
+var statusClass={approved:'b-ok',rejected:'b-bad',pending:'b-warn',awaiting_docs:'b-info'};
+var statusIcon={approved:'✓',rejected:'✕',pending:'⏳',awaiting_docs:'📄'};
+var currentRejectId=null;
+var allRequests=[];
+var docsAddress='';
+var searchTimer=null;
+
+function searchChanged(){clearTimeout(searchTimer);searchTimer=setTimeout(load,400);}
+
+function load(){
+  var p=new URLSearchParams();
+  var s=document.getElementById('fSearch'); if(s&&s.value.trim())p.set('search',s.value.trim());
+  var st=document.getElementById('fStatus'); if(st&&st.value)p.set('status',st.value);
+  var pr=document.getElementById('fProject'); if(pr&&pr.value)p.set('project_id',pr.value);
+  fetch('/api/requests?'+p).then(function(r){return r.json();}).then(function(d){
+    allRequests=d.requests;
+    docsAddress=d.docs_address||'';
+    var el=document.getElementById('reqList');
+    if(!d.requests.length){
+      el.innerHTML='<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>درخواستی یافت نشد</div>';
+      return;
+    }
+    var html='<div class="stack">'+d.requests.map(function(r){
+      var reviewNote=r.review_note?'<div class="req-info-row bad-row"><span>نظر مدیر</span><b>'+esc(r.review_note)+'</b></div>':'';
+      var adminBtns='';
+      {% if user.role == 'admin' %}
+      if(r.status==='pending'){
+        adminBtns='<button class="btn btn-navy btn-sm" onclick="openApprove('+r.id+')">✓ تأیید اولیه</button> '+
+                  '<button class="btn btn-ghost btn-sm" style="color:var(--bad)" onclick="openReject('+r.id+')">✕ رد</button>';
+      } else if(r.status==='awaiting_docs'){
+        adminBtns='<button class="btn btn-gold btn-sm" onclick="openComplete('+r.id+')">📄 دریافت مدارک و تأیید نهایی</button> '+
+                  '<button class="btn btn-ghost btn-sm" style="color:var(--bad)" onclick="openReject('+r.id+')">✕ رد</button>';
+      }
+      {% endif %}
+      var docsNotice='';
+      {% if user.role == 'member' %}
+      if(r.status==='awaiting_docs'){
+        docsNotice='<div class="alert alert-info" style="margin-top:8px">📄 درخواست شما تأیید اولیه شده. لطفاً اصل مدارک را حضوری تحویل دهید'+
+          (docsAddress?':<br><b>📍 '+esc(docsAddress)+'</b>':'.')+'</div>';
+      }
+      {% endif %}
+      var docBadge='';
+      var docCount=[r.receipt_path,r.agreement_path,r.sana_form_path,r.id_first_page_path,r.national_front_path,r.national_back_path,r.extra_photo_path].filter(function(x){return x;}).length;
+      if(docCount) docBadge='<span class="badge b-info" style="margin-right:6px">📎 '+docCount+' مدرک</span>';
+      return '<div class="req-card req-'+r.status+'">'+
+        '<div class="req-card-head">'+
+          '<div>'+
+            '<div class="req-card-title">'+
+              (r.project_name?esc(r.project_name)+' — ':'')+
+              'دفترچه <span class="mono">'+esc(r.booklet_code)+'</span>'+
+              (r.booklet_number?' (شماره: '+esc(r.booklet_number)+')':'')+
+            '</div>'+
+            '<div class="req-card-date">درخواست از: <b>'+esc(r.requester_name)+'</b> — '+new Date(r.created_at).toLocaleDateString('fa-IR')+'</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            docBadge+
+            '<span class="badge '+statusClass[r.status]+'">'+statusIcon[r.status]+' '+statusLabel[r.status]+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="req-card-body">'+
+          '<div class="req-info-row"><span>مالک جدید</span><b>'+esc(r.new_owner_full_name)+'</b></div>'+
+          '<div class="req-info-row"><span>کد ملی</span><span class="mono">'+esc(r.new_owner_national_code)+'</span></div>'+
+          reviewNote+
+          docsNotice+
+        '</div>'+
+        '<div class="req-card-foot" style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn-outline btn-sm" onclick="showDetail('+r.id+')">📋 جزئیات کامل</button>'+
+          adminBtns+
+        '</div>'+
+        '</div>';
+    }).join('')+'</div>';
+    el.innerHTML=html;
+  });
+}
+
+function showDetail(id){
+  var r=allRequests.find(function(x){return x.id===id;});
+  if(!r)return;
+
+  var docs=[
+    {label:'فیش واریزی',      path:r.receipt_path},
+    {label:'قول‌نامه',         path:r.agreement_path},
+    {label:'شناسنامه',        path:r.id_first_page_path},
+    {label:'کارت ملی (جلو)',   path:r.national_front_path},
+    {label:'کارت ملی (پشت)',   path:r.national_back_path},
+    {label:'سند اختیاری ۱',    path:r.sana_form_path},
+    {label:'سند اختیاری ۲',    path:r.extra_photo_path},
+  ].filter(function(d){return d.path;});
+
+  var docsHtml='';
+  window._reqDocImages=docs.filter(function(d){return /\.(jpg|jpeg|png|gif|webp)$/i.test(d.path);})
+    .map(function(d){return {src:'/uploads/'+d.path, label:d.label};});
+  if(docs.length){
+    var imgIdx=0;
+    docsHtml='<div class="doc-section" style="margin-top:14px">'+
+      '<div class="doc-sec-label">مدارک پیوست</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px">'+
+      docs.map(function(d){
+        var isImg=/\.(jpg|jpeg|png|gif|webp)$/i.test(d.path);
+        if(isImg){
+          var thisIdx=imgIdx++;
+          return '<div style="border-radius:10px;overflow:hidden;border:1px solid var(--border)">'+
+            '<a href="#" onclick="imgViewer.open(window._reqDocImages,'+thisIdx+');return false;">'+
+            '<img src="/uploads/'+d.path+'" alt="'+d.label+'" style="width:100%;height:130px;object-fit:cover;display:block;cursor:zoom-in">'+
+            '</a>'+
+            '<div style="font-size:11px;padding:6px 8px;color:var(--muted);text-align:center">'+d.label+'</div>'+
+            '</div>';
+        } else {
+          return '<a href="/uploads/'+d.path+'" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border);border-radius:10px;padding:16px;font-size:12px;color:var(--text)">'+
+            '<span style="font-size:28px">📄</span><span>'+d.label+'</span></a>';
+        }
+      }).join('')+
+      '</div></div>';
+  }
+
+  document.getElementById('detailBody').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:14px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center">'+
+      '<span class="badge '+statusClass[r.status]+'">'+statusIcon[r.status]+' '+statusLabel[r.status]+'</span>'+
+      '<span style="font-size:12px;color:var(--muted)">'+new Date(r.created_at).toLocaleDateString('fa-IR')+'</span>'+
+    '</div>'+
+
+    '<div class="doc-section"><div class="doc-sec-label">اطلاعات دفترچه</div>'+
+      '<div class="doc-row"><span class="doc-key">پروژه</span><span class="doc-val">'+esc(r.project_name||'—')+'</span></div>'+
+      '<div class="doc-row"><span class="doc-key">کد دفترچه</span><span class="doc-val mono">'+esc(r.booklet_code)+'</span></div>'+
+      (r.booklet_number?'<div class="doc-row"><span class="doc-key">شماره دفترچه</span><span class="doc-val mono">'+esc(r.booklet_number)+'</span></div>':'')+
+      (r.booklet_serial?'<div class="doc-row"><span class="doc-key">سریال</span><span class="doc-val">'+esc(r.booklet_serial)+'</span></div>':'')+
+      '<div class="doc-row"><span class="doc-key">نوع سهم</span><span class="doc-val">'+(r.booklet_share_type==='full'?'تمام‌سهم':'نیم‌سهم')+'</span></div>'+
+      (r.booklet_contract_no?'<div class="doc-row"><span class="doc-key">شماره قرارداد</span><span class="doc-val mono">'+esc(r.booklet_contract_no)+'</span></div>':'')+
+      (r.booklet_contract_amount?'<div class="doc-row"><span class="doc-key">مبلغ قرارداد</span><span class="doc-val">'+Number(r.booklet_contract_amount).toLocaleString()+' ریال</span></div>':'')+
+    '</div>'+
+
+    '<div class="doc-section"><div class="doc-sec-label">درخواست‌دهنده</div>'+
+      '<div class="doc-row"><span class="doc-key">نام</span><span class="doc-val">'+esc(r.requester_name)+'</span></div>'+
+    '</div>'+
+
+    '<div class="doc-section"><div class="doc-sec-label">مالک جدید</div>'+
+      '<div class="doc-row"><span class="doc-key">نام و نام خانوادگی</span><span class="doc-val">'+esc(r.new_owner_full_name)+'</span></div>'+
+      '<div class="doc-row"><span class="doc-key">کد ملی</span><span class="doc-val mono">'+esc(r.new_owner_national_code)+'</span></div>'+
+      '<div class="doc-row"><span class="doc-key">موبایل</span><span class="doc-val">'+esc(r.new_owner_phone)+'</span></div>'+
+    '</div>'+
+
+    (r.note?'<div class="alert alert-info"><b>توضیحات:</b> '+esc(r.note)+'</div>':'')+
+    (r.review_note?'<div class="alert alert-bad"><b>نظر مدیر:</b> '+esc(r.review_note)+'</div>':'')+
+
+    docsHtml+
+    '</div>';
+
+  {% if user.role == 'admin' %}
+  if(r.status==='pending'){
+    document.getElementById('detailFoot').innerHTML=
+      '<button class="btn btn-navy" onclick="modal.close(\'detailModal\');openApprove('+r.id+')">✓ تأیید اولیه</button>'+
+      '<button class="btn btn-ghost" style="color:var(--bad);border-color:var(--bad)" onclick="modal.close(\'detailModal\');openReject('+r.id+')">✕ رد درخواست</button>'+
+      '<button class="btn btn-ghost" onclick="modal.close(\'detailModal\')">بستن</button>';
+  } else if(r.status==='awaiting_docs'){
+    document.getElementById('detailFoot').innerHTML=
+      '<button class="btn btn-gold" onclick="modal.close(\'detailModal\');openComplete('+r.id+')">📄 دریافت مدارک و تأیید نهایی</button>'+
+      '<button class="btn btn-ghost" style="color:var(--bad);border-color:var(--bad)" onclick="modal.close(\'detailModal\');openReject('+r.id+')">✕ رد درخواست</button>'+
+      '<button class="btn btn-ghost" onclick="modal.close(\'detailModal\')">بستن</button>';
+  } else {
+    document.getElementById('detailFoot').innerHTML='<button class="btn btn-ghost" onclick="modal.close(\'detailModal\')">بستن</button>';
+  }
+  {% else %}
+  document.getElementById('detailFoot').innerHTML='<button class="btn btn-ghost" onclick="modal.close(\'detailModal\')">بستن</button>';
+  {% endif %}
+
+  modal.open('detailModal');
+}
+
+var currentApproveId=null;
+function openApprove(id){
+  currentApproveId=id;
+  document.getElementById('approveNote').value='';
+  modal.open('approveModal');
+}
+function doApprove(btn){
+  btnLoading(btn,true);
+  fetch('/api/requests/'+currentApproveId+'/approve',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({review_note:document.getElementById('approveNote').value.trim()})
+  })
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){
+      btnLoading(btn,false);
+      if(!x.ok){toast(x.d.error||'خطا در تأیید','warn');return;}
+      modal.close('approveModal');
+      toast('درخواست تأیید شد');
+      load();
+    })
+    .catch(function(){btnLoading(btn,false);toast('خطا در ارتباط با سرور','warn');});
+}
+
+var currentCompleteId=null;
+function openComplete(id){
+  currentCompleteId=id;
+  document.getElementById('completeNote').value='';
+  modal.open('completeModal');
+}
+function doComplete(btn){
+  btnLoading(btn,true);
+  fetch('/api/requests/'+currentCompleteId+'/complete',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({review_note:document.getElementById('completeNote').value.trim()})
+  })
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){
+      btnLoading(btn,false);
+      if(!x.ok){toast(x.d.error||'خطا در تأیید نهایی','warn');return;}
+      modal.close('completeModal');
+      toast('انتقال نهایی انجام شد');
+      load();
+    })
+    .catch(function(){btnLoading(btn,false);toast('خطا در ارتباط با سرور','warn');});
+}
+
+function openReject(id){
+  currentRejectId=id;
+  document.getElementById('rejectNote').value='';
+  modal.open('rejectModal');
+}
+
+function doReject(btn){
+  var note=document.getElementById('rejectNote').value.trim();
+  if(!note){toast('دلیل رد را وارد کنید','warn');return;}
+  btnLoading(btn,true);
+  fetch('/api/requests/'+currentRejectId+'/reject',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({review_note:note})
+  }).then(function(){
+    btnLoading(btn,false);
+    modal.close('rejectModal');
+    toast('درخواست رد شد','warn');
+    load();
+  });
+}
+
+{% if user.role == 'admin' %}
+fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+  var sel=document.getElementById('fProject');
+  if(sel)sel.innerHTML='<option value="">همه پروژه‌ها</option>'+(d.projects||[]).map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');
+});
+{% endif %}
+load();
+</script>
+{% endblock %}

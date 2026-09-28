@@ -1,0 +1,179 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">{{ 'ویرایش آگهی' if listing_id else 'ثبت آگهی جدید' }}</h1>
+  <a href="/dashboard/marketplace/my-listings" class="btn btn-ghost">بازگشت به آگهی‌های من</a>
+</div>
+
+<div id="wrap" style="max-width:720px">در حال بارگذاری…</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var LISTING_ID = {{ listing_id or 'null' }};
+var listing = null;
+var myBooklets = [];
+var cfg = {};
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&lt;','<':'&lt;','>':'&gt;'}[c];}); }
+
+function renderForm(){
+  var wrap = document.getElementById('wrap');
+  var readOnlyBooklet = !!listing;
+
+  var bookletOptions = myBooklets.map(function(b){
+    var sel = listing && listing.booklet_id === b.id ? 'selected' : '';
+    return '<option value="'+b.id+'" '+sel+'>'+esc(b.code)+' — '+esc(b.project_name)+' ('+esc(b.share_label)+')</option>';
+  }).join('');
+
+  wrap.innerHTML =
+    '<div class="card card-p">'+
+      (!listing ? (
+        '<div class="field"><label>دفترچه *</label><select class="input" id="f_booklet" '+(readOnlyBooklet?'disabled':'')+'>'+
+          '<option value="">— انتخاب دفترچه —</option>'+bookletOptions+
+        '</select></div>'
+      ) : '') +
+      '<div class="field"><label>عنوان آگهی *</label><input class="input" id="f_title" maxlength="200" placeholder="مثلاً: دفترچه تمام‌سهم پروژه ثمین" value="'+esc(listing?listing.title:'')+'"></div>'+
+      '<div class="grid-2">'+
+        '<div class="field"><label>نوع دفترچه/امتیاز</label><input class="input" id="f_unit" maxlength="150" value="'+esc(listing?listing.unit_type:'')+'"></div>'+
+        '<div class="field"><label>متراژ (متر) — اختیاری</label><input class="input" type="number" id="f_area" value="'+(listing&&listing.area?listing.area:'')+'"></div>'+
+      '</div>'+
+      '<div class="grid-2">'+
+        '<div class="field"><label>قیمت فروش (تومان) *</label><input class="input" type="text" inputmode="numeric" id="f_price" data-amount value="'+(listing?listing.price:'')+'"></div>'+
+        '<div class="field"><label>قابل مذاکره؟</label><select class="input" id="f_negotiable">'+
+          '<option value="0" '+(listing&&!listing.negotiable?'selected':'')+'>غیرقابل مذاکره</option>'+
+          '<option value="1" '+(listing&&listing.negotiable?'selected':'')+'>قابل مذاکره</option>'+
+        '</select></div>'+
+      '</div>'+
+      '<div class="field"><label>شرایط فروش</label><textarea class="input" id="f_terms" rows="2">'+esc(listing?listing.sale_terms:'')+'</textarea></div>'+
+      '<div class="field"><label>توضیحات</label><textarea class="input" id="f_desc" rows="4">'+esc(listing?listing.description:'')+'</textarea></div>'+
+      '<div class="field"><label>روش ارتباط با خریدار</label><select class="input" id="f_contact_method" onchange="toggleContactPhone()">'+
+        '<option value="request" '+(!listing||listing.contact_method=='request'?'selected':'')+'>فقط درخواست خرید از سایت</option>'+
+        '<option value="phone" '+(listing&&listing.contact_method=='phone'?'selected':'')+'>فقط تماس تلفنی</option>'+
+        '<option value="both" '+(listing&&listing.contact_method=='both'?'selected':'')+'>هر دو</option>'+
+      '</select></div>'+
+      '<div class="field" id="phoneField"><label>شماره تماس نمایش‌داده‌شده</label><input class="input" id="f_phone" maxlength="30" value="'+esc(listing?listing.contact_phone:'')+'" placeholder="09xxxxxxxxx"></div>'+
+      '<div id="formErr" class="alert alert-bad" style="display:none"></div>'+
+      '<button class="btn btn-navy btn-block" onclick="submitForm(this)">'+(listing?'ذخیره تغییرات':'ادامه')+'</button>'+
+    '</div>' +
+    (listing ? renderStatusPanel() : '');
+
+  toggleContactPhone();
+
+  var priceEl = document.getElementById('f_price');
+  priceEl.addEventListener('input', function(){ fmtAmt(priceEl); });
+  priceEl.addEventListener('keydown', function(e){
+    if(e.key.length===1 && !/[0-9]/.test(e.key)) e.preventDefault();
+  });
+  if (priceEl.value) fmtAmt(priceEl);
+}
+
+function toggleContactPhone(){
+  var m = document.getElementById('f_contact_method').value;
+  document.getElementById('phoneField').style.display = (m === 'request') ? 'none' : '';
+}
+
+function renderStatusPanel(){
+  if (listing.status === 'waiting_payment') {
+    return '<div class="card card-p">'+
+      '<h3 style="font-size:14px;font-weight:800;margin-bottom:10px">هزینه ثبت و انتشار آگهی</h3>'+
+      '<p style="font-size:13px;margin-bottom:6px">مبلغ: <b>'+Number(listing.fee_amount).toLocaleString()+'</b> تومان</p>'+
+      (cfg.payment_info ? '<div class="alert alert-info" style="white-space:pre-line">'+esc(cfg.payment_info)+'</div>' : '')+
+      '<div class="field"><label>تاریخ پرداخت *</label><input class="input" id="p_date" placeholder="۱۴۰۴/۰۵/۱۶"></div>'+
+      '<div class="field"><label>شماره پیگیری (اختیاری)</label><input class="input" id="p_track"></div>'+
+      '<div class="field"><label>تصویر فیش پرداخت *</label><input type="file" class="input" id="p_file" accept="image/*,.pdf"></div>'+
+      '<div id="payErr" class="alert alert-bad" style="display:none"></div>'+
+      '<button class="btn btn-gold btn-block" onclick="submitPayment(this)">ثبت پرداخت</button>'+
+    '</div>';
+  }
+  if (listing.status === 'payment_review') {
+    return '<div class="alert alert-info">فیش پرداخت شما ارسال شده و در انتظار بررسی مدیر است.</div>';
+  }
+  if (listing.status === 'admin_review') {
+    return '<div class="alert alert-info">آگهی شما در حال بررسی نهایی مدیر است.</div>';
+  }
+  if (listing.status === 'published') {
+    return '<div class="alert alert-ok">این آگهی هم‌اکنون در بازار منتشر شده — <a href="/marketplace/'+listing.slug+'" target="_blank">مشاهده در سایت</a></div>';
+  }
+  return '';
+}
+
+function submitForm(btn){
+  var err = document.getElementById('formErr'); err.style.display = 'none';
+  var title = document.getElementById('f_title').value.trim();
+  var price = getRawAmt(document.getElementById('f_price'));
+  if (!listing) {
+    var bookletId = document.getElementById('f_booklet').value;
+    if (!bookletId) { err.textContent = 'انتخاب دفترچه الزامی است.'; err.style.display=''; return; }
+  }
+  if (!title || !price || Number(price) <= 0) {
+    err.textContent = 'عنوان و قیمت فروش الزامی است.'; err.style.display=''; return;
+  }
+  var contactMethod = document.getElementById('f_contact_method').value;
+  var phone = document.getElementById('f_phone').value.trim();
+  if (contactMethod !== 'request' && !phone) {
+    err.textContent = 'برای نمایش شماره تماس، وارد کردن آن الزامی است.'; err.style.display=''; return;
+  }
+
+  var data = {
+    title: title, unit_type: document.getElementById('f_unit').value.trim(),
+    area: document.getElementById('f_area').value || null,
+    price: price, negotiable: document.getElementById('f_negotiable').value,
+    sale_terms: document.getElementById('f_terms').value.trim(),
+    description: document.getElementById('f_desc').value.trim(),
+    contact_method: contactMethod, contact_phone: phone,
+  };
+
+  btnLoading(btn, true);
+  var url, method;
+  if (listing) { url = '/api/marketplace/listings/'+listing.id; }
+  else { data.booklet_id = document.getElementById('f_booklet').value; url = '/api/marketplace/listings'; }
+
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+    .then(function(x){
+      btnLoading(btn, false);
+      if (!x.ok) { err.textContent = x.d.error || 'خطا در ثبت آگهی'; err.style.display=''; return; }
+      toast(listing ? 'تغییرات ذخیره شد' + (x.d.sent_to_review ? ' — آگهی دوباره وارد بررسی مدیر شد' : '') : 'آگهی ثبت شد');
+      if (!listing) { window.location.href = '/dashboard/marketplace/edit/' + x.d.listing.id; }
+      else { listing = x.d.listing; renderForm(); }
+    })
+    .catch(function(){ btnLoading(btn, false); err.textContent = 'خطا در ارتباط با سرور'; err.style.display=''; });
+}
+
+function submitPayment(btn){
+  var err = document.getElementById('payErr'); err.style.display = 'none';
+  var date = document.getElementById('p_date').value.trim();
+  var file = document.getElementById('p_file').files[0];
+  if (!date || !file) { err.textContent = 'تاریخ پرداخت و تصویر فیش الزامی است.'; err.style.display=''; return; }
+
+  var fd = new FormData();
+  fd.append('receipt', file);
+  fd.append('payment_date', date);
+  fd.append('tracking_code', document.getElementById('p_track').value.trim());
+
+  btnLoading(btn, true);
+  fetch('/api/marketplace/listings/'+listing.id+'/payment', {method:'POST', body: fd})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+    .then(function(x){
+      btnLoading(btn, false);
+      if (!x.ok) { err.textContent = x.d.error || 'خطا در ثبت پرداخت'; err.style.display=''; return; }
+      toast('فیش پرداخت ارسال شد');
+      listing = x.d.listing; renderForm();
+    })
+    .catch(function(){ btnLoading(btn, false); err.textContent = 'خطا در ارتباط با سرور'; err.style.display=''; });
+}
+
+Promise.all([
+  fetch('/api/marketplace/config').then(function(r){return r.json();}),
+  fetch('/api/profile/me').then(function(r){return r.json();}),
+  LISTING_ID ? fetch('/api/marketplace/listings/'+LISTING_ID+'/detail').then(function(r){return r.json();}) : Promise.resolve(null),
+]).then(function(res){
+  cfg = res[0];
+  myBooklets = res[1].booklets || [];
+  if (res[2]) { listing = res[2].listing; }
+  renderForm();
+}).catch(function(){
+  document.getElementById('wrap').innerHTML = '<div class="alert alert-bad">خطا در بارگذاری اطلاعات</div>';
+});
+</script>
+{% endblock %}

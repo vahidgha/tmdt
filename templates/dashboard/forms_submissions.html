@@ -1,0 +1,200 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <div>
+    <a href="/dashboard/forms" style="font-size:13px;color:var(--muted)">← فرم‌ها</a>
+    <h1 class="pg-title">پاسخ‌های فرم: {{ form.title }}</h1>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="/dashboard/forms/{{ form.id }}/builder" class="btn btn-ghost btn-sm">ویرایشگر</a>
+    <a href="/api/forms/{{ form.id }}/export" class="btn btn-gold btn-sm">دانلود اکسل</a>
+  </div>
+</div>
+
+<!-- Analytics strip -->
+<div id="analyticsStrip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px"></div>
+
+<!-- Filters -->
+<div class="card" style="padding:14px 20px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <select class="input" id="filterStatus" style="width:160px" onchange="loadSubs()">
+    <option value="">همه وضعیت‌ها</option>
+    <option value="submitted">ثبت شده</option>
+    <option value="reviewing">در بررسی</option>
+    <option value="approved">تأیید شده</option>
+    <option value="rejected">رد شده</option>
+  </select>
+  <span style="color:var(--muted);font-size:13px" id="totalLabel"></span>
+</div>
+
+<!-- Table -->
+<div class="card" style="padding:0;overflow:clip">
+  <div class="tbl-wrap" style="border:none;border-radius:0">
+    <table class="tbl" id="subTable">
+      <thead><tr>
+        <th>#</th><th>فرستنده</th><th>وضعیت</th><th>تاریخ ثبت</th><th>عملیات</th>
+      </tr></thead>
+      <tbody id="subBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">در حال بارگذاری…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" style="display:flex;gap:8px;justify-content:center;margin-top:16px"></div>
+
+<!-- Detail modal -->
+<div class="modal" id="subModal">
+  <div class="modal-box" style="max-width:640px;max-height:80vh;overflow-y:auto">
+    <div class="modal-head">
+      <span class="modal-title">جزئیات پاسخ</span>
+      <button class="modal-x" onclick="modal.close('subModal')">×</button>
+    </div>
+    <div class="modal-body" id="subDetail">در حال بارگذاری…</div>
+    <div class="modal-foot" id="subActions"></div>
+  </div>
+</div>
+
+<style>
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:var(--navy,#0E1B32);color:#C8A456;padding:10px 14px;text-align:right;font-weight:600}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--hover)}
+.sub-val-row{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.sub-val-row:last-child{border-bottom:none}
+.sub-val-label{color:var(--muted);min-width:140px;flex-shrink:0}
+.sub-val-value{flex:1;word-break:break-all}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px}
+.stat-card .num{font-size:24px;font-weight:700;color:var(--gold)}
+.stat-card .lbl{font-size:11px;color:var(--muted)}
+</style>
+
+<script>
+const FORM_ID = {{ form.id }};
+let currentPage = 1;
+const PER = 20;
+let totalSubs = 0;
+let currentSub = null;
+let formFields = [];
+
+const STATUS_LABEL = {submitted:'ثبت شده',reviewing:'در بررسی',approved:'تأیید شده',rejected:'رد شده'};
+const STATUS_COLOR = {submitted:'badge-muted',reviewing:'badge-warn',approved:'badge-ok',rejected:'badge-err'};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+async function loadAnalytics(){
+  const r = await fetch(`/api/forms/${FORM_ID}/analytics`);
+  const d = await r.json();
+  const bs = d.by_status || {};
+  document.getElementById('analyticsStrip').innerHTML = `
+    <div class="stat-card"><div class="num">${d.total}</div><div class="lbl">کل پاسخ‌ها</div></div>
+    <div class="stat-card"><div class="num">${bs.submitted||0}</div><div class="lbl">ثبت شده</div></div>
+    <div class="stat-card"><div class="num">${bs.reviewing||0}</div><div class="lbl">در بررسی</div></div>
+    <div class="stat-card"><div class="num">${bs.approved||0}</div><div class="lbl">تأیید شده</div></div>
+    <div class="stat-card"><div class="num">${bs.rejected||0}</div><div class="lbl">رد شده</div></div>
+  `;
+}
+
+async function loadSubs(){
+  const status = document.getElementById('filterStatus').value;
+  let url = `/api/forms/${FORM_ID}/submissions?page=${currentPage}&per=${PER}`;
+  if(status) url += `&status=${status}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  totalSubs = d.total;
+  document.getElementById('totalLabel').textContent = `${totalSubs} پاسخ`;
+  const tbody = document.getElementById('subBody');
+  if(!d.submissions?.length){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">هیچ پاسخی یافت نشد</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.submissions.map(s=>`
+    <tr>
+      <td>${s.id}</td>
+      <td>${esc(s.submitter_name)}</td>
+      <td><span class="badge ${STATUS_COLOR[s.status]||''}">${STATUS_LABEL[s.status]||s.status}</span></td>
+      <td>${new Date(s.created_at).toLocaleDateString('fa-IR',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-navy" onclick="viewSub(${s.id})">مشاهده</button>
+        <button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="deleteSub(${s.id})">حذف</button>
+      </td>
+    </tr>
+  `).join('');
+  renderPagination();
+}
+
+function renderPagination(){
+  const pages = Math.ceil(totalSubs/PER);
+  if(pages<=1){ document.getElementById('pagination').innerHTML=''; return; }
+  let html = '';
+  for(let i=1;i<=pages;i++){
+    html+=`<button class="btn btn-sm ${i===currentPage?'btn-navy':'btn-ghost'}" onclick="goPage(${i})">${i}</button>`;
+  }
+  document.getElementById('pagination').innerHTML=html;
+}
+
+function goPage(p){ currentPage=p; loadSubs(); }
+
+async function viewSub(sid){
+  const r = await fetch(`/api/forms/${FORM_ID}/submissions/${sid}`);
+  const d = await r.json();
+  currentSub = d.submission;
+  const vals = currentSub.values || {};
+  const rows = Object.entries(vals).map(([fid, val])=>{
+    const ff = formFields.find(f=>f.id==fid);
+    return `<div class="sub-val-row">
+      <div class="sub-val-label">${esc(ff?.label||'فیلد '+fid)}</div>
+      <div class="sub-val-value">${esc(val||'—')}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('subDetail').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <span class="badge ${STATUS_COLOR[currentSub.status]||''}">${STATUS_LABEL[currentSub.status]||currentSub.status}</span>
+        <span class="badge badge-muted">فرستنده: ${esc(currentSub.submitter_name)}</span>
+        <span class="badge badge-muted">${new Date(currentSub.created_at).toLocaleDateString('fa-IR',{year:'numeric',month:'long',day:'numeric'})}</span>
+      </div>
+    </div>
+    <div>${rows||'<div style="color:var(--muted)">داده‌ای ثبت نشده</div>'}</div>
+    ${currentSub.history?.length?`
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:13px">تاریخچه</div>
+      ${currentSub.history.map(h=>`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">${esc(h.actor)}: ${esc(h.action)} ${h.note?'— '+esc(h.note):''}</div>`).join('')}
+    </div>`:''}
+  `;
+  document.getElementById('subActions').innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-navy btn-sm" onclick="setStatus('reviewing')">در بررسی</button>
+      <button class="btn btn-sm" style="background:#16a34a;color:#fff" onclick="setStatus('approved')">تأیید</button>
+      <button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="setStatus('rejected')">رد</button>
+      <button class="btn btn-ghost btn-sm" onclick="modal.close('subModal')">بستن</button>
+    </div>
+  `;
+  modal.open('subModal');
+}
+
+async function setStatus(status){
+  if(!currentSub) return;
+  const r = await fetch(`/api/forms/${FORM_ID}/submissions/${currentSub.id}/status`,{
+    method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})
+  });
+  if(r.ok){ modal.close('subModal'); loadSubs(); loadAnalytics(); showToast('وضعیت بروز شد'); }
+  else showToast('خطا','error');
+}
+
+async function deleteSub(sid){
+  if(!confirm('این پاسخ حذف شود؟')) return;
+  const r = await fetch(`/api/forms/${FORM_ID}/submissions/${sid}`,{method:'DELETE'});
+  if(r.ok){ loadSubs(); loadAnalytics(); showToast('پاسخ حذف شد'); }
+  else showToast('خطا','error');
+}
+
+async function loadFields(){
+  const r = await fetch(`/api/forms/${FORM_ID}`);
+  const d = await r.json();
+  formFields = (d.form.steps||[]).flatMap(s=>s.fields||[]);
+}
+
+loadFields();
+loadAnalytics();
+loadSubs();
+</script>
+{% endblock %}

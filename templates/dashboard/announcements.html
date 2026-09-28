@@ -1,0 +1,308 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">اطلاعیه‌ها</h1>
+  {% if user.role == 'admin' %}
+  <div style="display:flex;gap:8px;align-items:center">
+    <select class="input" id="projFilterAnn" onchange="load()" style="max-width:200px">
+      <option value="">همه پروژه‌ها</option>
+    </select>
+    <button class="btn btn-gold" onclick="openAdd()">+ اطلاعیه جدید</button>
+  </div>
+  {% endif %}
+</div>
+<div id="annList" class="stagger">در حال بارگذاری…</div>
+
+{% if user.role == 'admin' %}
+<!-- Modal: اطلاعیه جدید / ویرایش -->
+<div class="modal" id="annModal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head">
+      <span class="modal-title" id="annModalTitle">اطلاعیه جدید</span>
+      <button class="modal-x" onclick="modal.close('annModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="annId">
+      <div id="annErr" class="alert alert-bad" style="display:none"></div>
+      <div class="grid-2">
+        <div class="field span-2"><label>عنوان *</label><input class="input" id="annT" placeholder="عنوان اطلاعیه"></div>
+        <div class="field span-2"><label>متن *</label><textarea class="input" id="annB" rows="5" placeholder="متن اطلاعیه را وارد کنید…"></textarea></div>
+        <div class="field span-2"><label>تصویر (اختیاری)</label><input type="file" class="input" id="annImg" accept="image/*" style="padding:6px"></div>
+        <div class="field"><label>پروژه (اختیاری)</label>
+          <select class="input" id="annProj">
+            <option value="">— همه اعضا —</option>
+          </select>
+        </div>
+        <div class="field"></div>
+        <div class="field"><label>تاریخ و ساعت انتشار (اختیاری)</label>
+          <div style="display:flex;gap:6px">
+            <input class="input" id="annPubDate" data-jdp placeholder="1404/05/01" style="flex:2">
+            <input class="input" type="time" id="annPubTime" style="flex:1">
+          </div>
+        </div>
+        <div class="field"><label>تاریخ و ساعت انقضا (اختیاری)</label>
+          <div style="display:flex;gap:6px">
+            <input class="input" id="annExpDate" data-jdp placeholder="1404/05/01" style="flex:2">
+            <input class="input" type="time" id="annExpTime" style="flex:1">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" id="annSubmitBtn" onclick="submitAnn(this)">ثبت اطلاعیه</button>
+      <button class="btn btn-ghost" onclick="modal.close('annModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var allProjects = [];
+
+/* ── تبدیل شمسی ↔ میلادی — چون pub_date/expires_at در بک‌اند DateTime واقعی
+   هستند (نه رشته شمسی مثل بقیه فیلدهای تاریخ سامانه)، باید قبل از ارسال
+   به میلادی تبدیل شوند تا با منطق مقایسه تاریخ در سرور سازگار بماند.
+   از تقویم فارسی داخلی مرورگر (Intl، بر پایه ICU) استفاده می‌شود تا
+   محاسبه صددرصد درست و مطابق تقویم رسمی باشد — نه فرمول دستی. */
+function _jalaliPartsOf(date){
+  var parts = new Intl.DateTimeFormat('en-US-u-ca-persian', {year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'}).formatToParts(date);
+  var o = {};
+  parts.forEach(function(p){ if(p.type!=='literal') o[p.type]=parseInt(p.value); });
+  return {y:o.year, m:o.month, d:o.day};
+}
+function jalaliToGregorianDate(jy, jm, jd){
+  var guess = new Date(Date.UTC(jy+621, jm-1, jd));
+  for (var i=0; i<60; i++){
+    var cur = _jalaliPartsOf(guess);
+    if (cur.y===jy && cur.m===jm && cur.d===jd) return guess;
+    var diffDays = (jy-cur.y)*365 + (jm-cur.m)*30 + (jd-cur.d);
+    if (diffDays===0) diffDays = (jy>cur.y || (jy===cur.y && (jm>cur.m || (jm===cur.m && jd>cur.d)))) ? 1 : -1;
+    guess = new Date(guess.getTime() + diffDays*86400000);
+  }
+  return guess;
+}
+/* رشته ورودی «1404/05/01» + ساعت «14:30» → ISO میلادی برای بک‌اند */
+function jalaliToIso(dateStr, timeStr){
+  if(!dateStr) return '';
+  var parts=dateStr.split('/');
+  if(parts.length!==3) return '';
+  var jy=parseInt(parts[0]),jm=parseInt(parts[1]),jd=parseInt(parts[2]);
+  if(!jy||!jm||!jd) return '';
+  var g=jalaliToGregorianDate(jy,jm,jd);
+  var hh='00',mm='00';
+  if(timeStr){ var t=timeStr.split(':'); hh=t[0]||'00'; mm=t[1]||'00'; }
+  return g.getUTCFullYear()+'-'+String(g.getUTCMonth()+1).padStart(2,'0')+'-'+String(g.getUTCDate()).padStart(2,'0')+'T'+hh+':'+mm+':00';
+}
+/* رشته ISO میلادی از بک‌اند → {date:'1404/05/01', time:'14:30'} برای نمایش */
+function isoToJalaliParts(iso){
+  if(!iso) return {date:'', time:''};
+  var norm = /[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : iso + 'Z';
+  var d=new Date(norm);
+  if(isNaN(d.getTime())) return {date:'', time:''};
+  var j=_jalaliPartsOf(d);
+  var date=j.y+'/'+String(j.m).padStart(2,'0')+'/'+String(j.d).padStart(2,'0');
+  var time=String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+  return {date:date, time:time};
+}
+
+function loadProjects() {
+  fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+    allProjects = d.projects || [];
+    var opts = '<option value="">— همه اعضا —</option>' +
+      allProjects.map(function(p){ return '<option value="'+p.id+'">'+p.name+'</option>'; }).join('');
+    var sel = document.getElementById('annProj');
+    if (sel) sel.innerHTML = opts;
+    var pf = document.getElementById('projFilterAnn');
+    if (pf) pf.innerHTML = '<option value="">همه پروژه‌ها</option>' +
+      allProjects.map(function(p){ return '<option value="'+p.id+'">'+p.name+'</option>'; }).join('');
+  });
+}
+
+function load() {
+  var pid = (document.getElementById('projFilterAnn') || {}).value || '';
+  fetch('/api/announcements').then(function(r){return r.json();}).then(function(d){
+    var items = d.announcements || [];
+    if (pid) items = items.filter(function(a){ return String(a.project_id) === pid; });
+    var el = document.getElementById('annList');
+    if (!items.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>هیچ اطلاعیه‌ای یافت نشد</div>';
+      return;
+    }
+    var isAdmin = {{ 'true' if user.role == 'admin' else 'false' }};
+    window._allAnns = items;
+    el.innerHTML = items.map(function(a) {
+      var meta = a.author + ' — ' + new Date(a.date).toLocaleDateString('fa-IR');
+      if (a.project_name) meta += ' | 🏗 ' + a.project_name;
+      if (a.pub_date) meta += ' | 📅 انتشار: ' + new Date(a.pub_date).toLocaleDateString('fa-IR');
+      if (a.expires_at) meta += ' | ⏱ انقضا: ' + new Date(a.expires_at).toLocaleDateString('fa-IR');
+      var img = a.image_path ? '<img src="/static/uploads/'+a.image_path+'" alt="" style="width:100%;max-height:320px;object-fit:cover;border-radius:8px;margin-bottom:12px">' : '';
+      // gallery
+      var gallery = '';
+      if (a.media && a.media.length) {
+        var items2 = a.media.map(function(m) {
+          var thumb = m.file_type === 'video'
+            ? '<div style="height:100px;background:#111;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;border-radius:8px" onclick="openAnnLightbox(\'video\',\'/uploads/'+m.file_path+'\')">▶</div>'
+            : '<div style="height:100px;background-image:url(\'/uploads/'+m.file_path+'\');background-size:cover;background-position:center;cursor:pointer;border-radius:8px" onclick="openAnnLightbox(\'image\',\'/uploads/'+m.file_path+'\')"></div>';
+          var del = isAdmin
+            ? '<button onclick="delAnnMedia('+a.id+','+m.id+',this)" style="position:absolute;top:4px;left:4px;background:rgba(239,68,68,.85);border:none;color:#fff;border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer">×</button>'
+            : '';
+          return '<div style="position:relative">'+thumb+del+(m.caption?'<div style="font-size:10px;padding:3px 4px;color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m.caption)+'</div>':'')+'</div>';
+        });
+        gallery = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:12px">'+items2.join('')+'</div>';
+      }
+      var uploadBtn = isAdmin
+        ? '<button class="btn btn-ghost btn-sm" onclick="openAnnUpload('+a.id+', this)">📎 افزودن تصویر/ویدیو</button>'
+        : '';
+      var adminBtns = isAdmin
+        ? '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button class="btn btn-ghost btn-sm" onclick="openEdit('+a.id+')">ویرایش</button>' +
+            uploadBtn +
+            '<button class="btn-outline bad" onclick="delAnn('+a.id+', this)">حذف</button>' +
+          '</div>'
+        : '';
+      var uploadArea = isAdmin
+        ? '<div id="annUpload'+a.id+'" style="display:none;background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:12px;margin-top:12px">' +
+            '<div class="field"><label>فایل (تصویر یا ویدیو)</label><input type="file" class="input" id="annFile'+a.id+'" accept="image/*,video/*"></div>' +
+            '<div class="field"><label>توضیح (اختیاری)</label><input class="input" id="annFileCap'+a.id+'" placeholder="توضیح فایل…"></div>' +
+            '<button class="btn btn-navy btn-sm" onclick="uploadAnnMedia('+a.id+',this)">آپلود</button>' +
+          '</div>'
+        : '';
+      return '<div class="acc" id="annCard'+a.id+'">' +
+        '<div class="acc-head" onclick="this.parentElement.classList.toggle(\'open\')">' +
+          '<div><div class="acc-title">'+esc(a.title)+'</div><div class="acc-date">'+meta+'</div></div>' +
+          '<span class="acc-chevron">▾</span>' +
+        '</div>' +
+        '<div class="acc-body">'+img+gallery+'<p style="line-height:2">'+esc(a.body).replace(/\n/g,'<br>')+'</p>'+adminBtns+uploadArea+'</div>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+function openAdd() {
+  document.getElementById('annId').value = '';
+  document.getElementById('annT').value = '';
+  document.getElementById('annB').value = '';
+  document.getElementById('annImg').value = '';
+  document.getElementById('annProj').value = '';
+  document.getElementById('annPubDate').value = '';
+  document.getElementById('annPubTime').value = '';
+  document.getElementById('annExpDate').value = '';
+  document.getElementById('annExpTime').value = '';
+  document.getElementById('annErr').style.display = 'none';
+  document.getElementById('annModalTitle').textContent = 'اطلاعیه جدید';
+  document.getElementById('annSubmitBtn').textContent = 'ثبت اطلاعیه';
+  modal.open('annModal');
+}
+
+function openEdit(id) {
+  var a = (window._allAnns || []).find(function(x){ return x.id === id; });
+  if (!a) return;
+  document.getElementById('annId').value = a.id;
+  document.getElementById('annT').value = a.title;
+  document.getElementById('annB').value = a.body;
+  document.getElementById('annImg').value = '';
+  document.getElementById('annProj').value = a.project_id || '';
+  var pubParts = isoToJalaliParts(a.pub_date);
+  var expParts = isoToJalaliParts(a.expires_at);
+  document.getElementById('annPubDate').value = pubParts.date;
+  document.getElementById('annPubTime').value = pubParts.time;
+  document.getElementById('annExpDate').value = expParts.date;
+  document.getElementById('annExpTime').value = expParts.time;
+  document.getElementById('annErr').style.display = 'none';
+  document.getElementById('annModalTitle').textContent = 'ویرایش اطلاعیه';
+  document.getElementById('annSubmitBtn').textContent = 'ذخیره تغییرات';
+  modal.open('annModal');
+}
+
+function submitAnn(btn) {
+  var err = document.getElementById('annErr'); err.style.display = 'none';
+  var aid = document.getElementById('annId').value;
+  var fd = new FormData();
+  fd.append('title', document.getElementById('annT').value.trim());
+  fd.append('body',  document.getElementById('annB').value.trim());
+  var imgFile = document.getElementById('annImg').files[0];
+  if (imgFile) fd.append('image', imgFile);
+  fd.append('project_id', document.getElementById('annProj').value);
+  fd.append('pub_date',   jalaliToIso(document.getElementById('annPubDate').value.trim(), document.getElementById('annPubTime').value));
+  fd.append('expires_at', jalaliToIso(document.getElementById('annExpDate').value.trim(), document.getElementById('annExpTime').value));
+  var url = aid ? '/api/announcements/'+aid : '/api/announcements';
+  btnLoading(btn, true);
+  fetch(url, {method:'POST', body:fd})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){
+      btnLoading(btn, false);
+      if (!x.ok){err.textContent=x.d.error||'خطا';err.style.display='';return;}
+      modal.close('annModal');
+      toast(aid ? 'اطلاعیه ویرایش شد' : 'اطلاعیه ثبت شد');
+      load();
+    });
+}
+
+function delAnn(id, btn) {
+  confirmAction('این اطلاعیه حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    btnLoading(btn, true);
+    fetch('/api/announcements/' + id, {method:'DELETE'}).then(function(){load();});
+  });
+}
+
+function openAnnUpload(aid, btn) {
+  var area = document.getElementById('annUpload'+aid);
+  if (area) area.style.display = area.style.display === 'none' ? '' : 'none';
+}
+
+function uploadAnnMedia(aid, btn) {
+  var file = document.getElementById('annFile'+aid).files[0];
+  if (!file) { toast('لطفاً یک فایل انتخاب کنید'); return; }
+  var fd = new FormData();
+  fd.append('file', file);
+  fd.append('caption', document.getElementById('annFileCap'+aid).value.trim());
+  btnLoading(btn, true);
+  fetch('/api/announcements/'+aid+'/media', {method:'POST', body:fd})
+    .then(function(r){return r.json();}).then(function(d){
+      btnLoading(btn, false);
+      if (d.ok) { toast('فایل آپلود شد'); load(); }
+      else toast(d.error || 'خطا در آپلود');
+    });
+}
+
+function delAnnMedia(aid, mid, btn) {
+  confirmAction('این فایل حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    fetch('/api/announcements/'+aid+'/media/'+mid, {method:'DELETE'}).then(function(){load();});
+  });
+}
+
+var annLightbox = null;
+function openAnnLightbox(type, url) {
+  if (!annLightbox) {
+    annLightbox = document.createElement('div');
+    annLightbox.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column';
+    annLightbox.onclick = function(e){ if(e.target===annLightbox) closeAnnLightbox(); };
+    document.body.appendChild(annLightbox);
+  }
+  var closeBtn = '<button onclick="closeAnnLightbox()" style="position:absolute;top:16px;left:16px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer">×</button>';
+  if (type === 'video') {
+    annLightbox.innerHTML = closeBtn + '<video src="'+url+'" controls autoplay style="max-width:90vw;max-height:85vh;border-radius:10px"></video>';
+  } else {
+    annLightbox.innerHTML = closeBtn + '<img src="'+url+'" style="max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain">';
+  }
+  annLightbox.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeAnnLightbox() {
+  if (annLightbox) {
+    var v = annLightbox.querySelector('video');
+    if (v) v.pause();
+    annLightbox.style.display = 'none';
+  }
+  document.body.style.overflow = '';
+}
+
+loadProjects();
+load();
+</script>
+{% endblock %}

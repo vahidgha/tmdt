@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _desc  = (settings.get('about_text') or '').strip()[:160] or ('درباره ' ~ _title) %}
+  {% set _url   = request.url_root.rstrip('/') + '/about' %}
+  {% set _logo_url = (request.url_root.rstrip('/') ~ '/uploads/' ~ settings.site_logo) if settings.get('site_logo') else '' %}
+  <title>درباره ما — {{ _title }}</title>
+  <meta name="description" content="{{ _desc }}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{{ _url }}">
+
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fa_IR">
+  <meta property="og:url" content="{{ _url }}">
+  <meta property="og:site_name" content="{{ _title }}">
+  <meta property="og:title" content="درباره ما — {{ _title }}">
+  <meta property="og:description" content="{{ _desc }}">
+  {% if _logo_url %}<meta property="og:image" content="{{ _logo_url }}">{% endif %}
+
+  {% if settings.get('site_logo') %}
+  <link rel="apple-touch-icon" href="/uploads/{{ settings.site_logo }}">
+  <link rel="icon" type="image/png" href="/uploads/{{ settings.site_logo }}">
+  {% else %}
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  {% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/public.css?v={{ app_version }}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": {{ _title|tojson }}, "item": {{ (request.url_root.rstrip('/') ~ '/')|tojson }} },
+      {"@type": "ListItem", "position": 2, "name": "درباره ما", "item": {{ _url|tojson }} }
+    ]
+  }
+  </script>
+  <style>
+    .about-hero {
+      background: linear-gradient(160deg, #12172B 0%, #1E2545 60%, #15213A 100%);
+      padding: 150px 20px 90px;
+      position: relative;
+      overflow: hidden;
+    }
+    .about-hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 60% at 50% 20%, rgba(184,146,90,.14) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .about-hero-inner { max-width: 1100px; margin: 0 auto; position: relative; text-align: center; }
+    .about-hero .sec-kicker { color: var(--p-gold); justify-content: center; }
+    .about-hero h1 { font-size: clamp(28px,5vw,44px); font-weight: 800; color: #F5F1E6; margin: 14px 0 0; }
+    .about-hero h1 span { color: var(--p-gold); }
+
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 48px;
+      align-items: center;
+    }
+    @media (max-width: 860px) { .about-grid { grid-template-columns: 1fr; } }
+    .about-text { font-size: 15.5px; line-height: 2.1; color: var(--p-text2); white-space: pre-line; }
+    .about-photo-wrap {
+      border-radius: var(--p-r3);
+      overflow: hidden;
+      box-shadow: var(--p-sh-l);
+      aspect-ratio: 4/3;
+      background: var(--p-card);
+      border: 1px solid var(--p-border);
+    }
+    .about-photo-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .about-photo-ph {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--p-muted2); font-size: 40px;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+    .contact-card {
+      background: var(--p-card);
+      border: 1px solid var(--p-border);
+      border-radius: var(--p-r2);
+      padding: 22px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      box-shadow: var(--p-sh-s);
+    }
+    .contact-icon {
+      width: 42px; height: 42px; flex-shrink: 0;
+      border-radius: 11px;
+      background: linear-gradient(160deg,var(--p-gold-h),var(--p-gold-deep));
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+    }
+    .contact-label { font-size: 12px; color: var(--p-muted); font-weight: 600; margin-bottom: 4px; }
+    .contact-value { font-size: 14.5px; color: var(--p-text); font-weight: 600; line-height: 1.8; }
+  </style>
+</head>
+<body class="pub">
+
+<!-- ── Navbar ────────────────────────────────────────────── -->
+<div class="pub-nav-wrap">
+  <nav class="pub-nav liquid-glass" id="pubNav">
+    <div class="pub-nav-inner">
+      <a href="/" class="pub-nav-brand" style="text-decoration:none">
+        <div class="pub-nav-logo">
+          {% if settings.get('site_logo') %}
+          <img src="/uploads/{{ settings.site_logo }}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">
+          {% else %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round">
+            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
+          </svg>
+          {% endif %}
+        </div>
+        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+      </a>
+      <div class="pub-nav-links">
+        <a href="/marketplace" class="pub-nav-link">بازار خرید و فروش</a>
+        <a href="/about" class="pub-nav-link" style="color:var(--p-gold)">درباره ما</a>
+      </div>
+      <a href="/login" class="pub-nav-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+        </svg>
+        ورود اعضا
+      </a>
+    </div>
+  </nav>
+</div>
+
+<!-- ── Hero ─────────────────────────────────────────────── -->
+<section class="about-hero">
+  <div class="about-hero-inner">
+    <div class="sec-kicker reveal in">🏢 درباره ما</div>
+    <h1 class="reveal in">آشنایی با <span>{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span></h1>
+  </div>
+</section>
+
+<!-- ── About text + photo ──────────────────────────────── -->
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="about-grid">
+      <div class="about-text reveal">
+        {% if settings.get('about_text') %}{{ settings.about_text }}{% else %}
+اطلاعات این بخش هنوز توسط مدیریت تکمیل نشده است.
+        {% endif %}
+      </div>
+      <div class="about-photo-wrap reveal" style="transition-delay:.1s">
+        {% if settings.get('about_photo') %}
+        <img src="/uploads/{{ settings.about_photo }}" alt="{{ settings.get('site_title','') }}">
+        {% else %}
+        <div class="about-photo-ph">🏢</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if settings.get('site_address') or settings.get('site_phone') %}
+    <div class="contact-grid">
+      {% if settings.get('site_address') %}
+      <div class="contact-card reveal">
+        <div class="contact-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div>
+          <div class="contact-label">آدرس دفتر</div>
+          <div class="contact-value">{{ settings.site_address }}</div>
+        </div>
+      </div>
+      {% endif %}
+      {% if settings.get('site_phone') %}
+      <div class="contact-card reveal" style="transition-delay:.06s">
+        <div class="contact-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </div>
+        <div>
+          <div class="contact-label">تلفن تماس</div>
+          <div class="contact-value" dir="ltr" style="text-align:right">{{ settings.site_phone }}</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ── Managers ─────────────────────────────────────────── -->
+{% if settings.get('exec_manager') or settings.get('board_rep') or settings.get('third_name') %}
+<section class="pub-section leaders-section">
+  <div class="pub-container">
+    <div class="sec-kicker reveal">👥 مدیران</div>
+    <h2 class="sec-h2 reveal" style="transition-delay:.08s">هیئت <span>رئیسه و مدیریت</span></h2>
+    <div class="leaders-grid">
+      {% if settings.get('exec_manager') %}
+      <div class="leader-card reveal" style="transition-delay:.05s">
+        <div class="leader-photo">
+          {% if settings.get('exec_photo') %}
+          <img src="/uploads/{{ settings.get('exec_photo') }}" alt="{{ settings.get('exec_manager') }}">
+          {% else %}
+          <div class="leader-ph">{{ settings.get('exec_manager','')[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="leader-card-name">{{ settings.get('exec_manager') }}</div>
+        <div class="leader-card-role">مدیر اجرایی</div>
+      </div>
+      {% endif %}
+      {% if settings.get('board_rep') %}
+      <div class="leader-card reveal" style="transition-delay:.12s">
+        <div class="leader-photo">
+          {% if settings.get('board_photo') %}
+          <img src="/uploads/{{ settings.get('board_photo') }}" alt="{{ settings.get('board_rep') }}">
+          {% else %}
+          <div class="leader-ph">{{ settings.get('board_rep','')[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="leader-card-name">{{ settings.get('board_rep') }}</div>
+        <div class="leader-card-role">{{ settings.get('board_title','نماینده هیئت رئیسه') }}</div>
+      </div>
+      {% endif %}
+      {% if settings.get('third_name') %}
+      <div class="leader-card reveal" style="transition-delay:.2s">
+        <div class="leader-photo">
+          {% if settings.get('third_photo') %}
+          <img src="/uploads/{{ settings.get('third_photo') }}" alt="{{ settings.get('third_name') }}">
+          {% else %}
+          <div class="leader-ph">{{ settings.get('third_name','')[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="leader-card-name">{{ settings.get('third_name') }}</div>
+        <div class="leader-card-role">{{ settings.get('third_role','عضو هیئت رئیسه') }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Footer ───────────────────────────────────────────── -->
+<footer class="pub-footer">
+  <div class="pub-container">
+    <div class="footer-top reveal">
+      <div>
+        <div class="footer-brand">
+          <div class="footer-logo">
+            {% if settings.get('site_logo') %}
+            <img src="/uploads/{{ settings.site_logo }}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">
+            {% else %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round">
+              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
+            </svg>
+            {% endif %}
+          </div>
+          <span class="footer-brand-name">{{ settings.get('site_title','هیئت امنای مسکن') }}</span>
+        </div>
+        <div class="footer-info">
+          {% if settings.get('site_address') %}<div>📍 {{ settings.site_address }}</div>{% endif %}
+          {% if settings.get('site_phone') %}<div>📞 {{ settings.site_phone }}</div>{% endif %}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <a href="/" style="color:#D9D3C2;font-size:13px;font-weight:600;text-decoration:none">صفحه اصلی</a>
+        <a href="/login" class="pub-nav-btn" style="align-self:center">ورود اعضا</a>
+      </div>
+    </div>
+    <div class="footer-copy">
+      تمامی حقوق مادی و معنوی این سامانه محفوظ و متعلق به <a href="https://Noyan.team" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline"><strong>نویان فناور آریا</strong></a> است.
+      <span style="opacity:.6;font-size:11px;margin-right:8px">نسخه {{ app_version }}</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+const revealEls = document.querySelectorAll('.reveal');
+if ('IntersectionObserver' in window && revealEls.length) {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: .12 });
+  revealEls.forEach(el => io.observe(el));
+} else {
+  revealEls.forEach(el => el.classList.add('in'));
+}
+</script>
+</body>
+</html>

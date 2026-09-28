@@ -1,0 +1,67 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">فرم‌ها</h1>
+</div>
+<input class="input" id="fmSearch" placeholder="جستجو در فرم‌ها…" oninput="renderForms()" style="max-width:320px;margin-bottom:16px">
+<div id="fmList" class="stagger"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+var allMineForms = [];
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function timeAgo(iso){
+  if(!iso) return '';
+  var d=new Date(iso), diff=(Date.now()-d.getTime())/1000;
+  if(diff<60)return 'همین الان';
+  if(diff<3600)return Math.floor(diff/60)+' دقیقه پیش';
+  if(diff<86400)return Math.floor(diff/3600)+' ساعت پیش';
+  return Math.floor(diff/86400)+' روز پیش';
+}
+
+function loadForms(){
+  fetch('/api/forms').then(function(r){return r.json();}).then(function(d){
+    allMineForms = d.forms || [];
+    renderForms();
+  }).catch(function(){
+    document.getElementById('fmList').innerHTML = '<div class="card card-p" style="color:var(--muted)">خطا در بارگذاری فرم‌ها</div>';
+  });
+}
+
+function renderForms(){
+  var q = (document.getElementById('fmSearch').value || '').trim().toLowerCase();
+  var items = allMineForms.filter(function(f){
+    return !q || f.title.toLowerCase().indexOf(q) > -1 || (f.description||'').toLowerCase().indexOf(q) > -1;
+  });
+  var el = document.getElementById('fmList');
+  if (!items.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h4M9 8h6M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg></div>' +
+      (q ? 'موردی یافت نشد' : 'در حال حاضر فرمی برای تکمیل وجود ندارد') + '</div>';
+    return;
+  }
+  el.innerHTML = items.map(function(f){
+    var badge = f.is_public
+      ? '<span class="badge b-ok">عمومی</span>'
+      : '<span class="badge b-info">مخصوص اعضا</span>';
+    var expired = f.expires_at && new Date(f.expires_at) < new Date();
+    var full = f.max_submissions && f.submission_count >= f.max_submissions;
+    var stateBadge = expired ? '<span class="badge b-bad">مهلت تمام شده</span>' : (full ? '<span class="badge b-bad">ظرفیت تکمیل</span>' : '');
+    return '<div class="card card-p" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:220px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+          '<b style="font-size:14.5px">' + esc(f.title) + '</b>' + badge + stateBadge +
+        '</div>' +
+        (f.description ? '<div style="font-size:12.5px;color:var(--muted);margin-bottom:4px">' + esc(f.description) + '</div>' : '') +
+        '<div style="font-size:11px;color:var(--muted2)">به‌روزرسانی: ' + timeAgo(f.updated_at) + '</div>' +
+      '</div>' +
+      (expired || full
+        ? '<button class="btn btn-ghost btn-sm" disabled>در دسترس نیست</button>'
+        : '<a class="btn btn-gold btn-sm" href="/dashboard/forms/public/' + f.slug + '" target="_blank">تکمیل فرم</a>') +
+    '</div>';
+  }).join('');
+}
+
+loadForms();
+</script>
+{% endblock %}

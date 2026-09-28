@@ -1,0 +1,557 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr" style="margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="/dashboard/forms" class="btn btn-ghost btn-sm">← برگشت</a>
+    <div>
+      <h1 class="pg-title" style="margin:0" id="formTitleDisplay">{{ form.title }}</h1>
+      <span id="formStatusBadge" class="badge" style="margin-top:2px"></span>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm" onclick="previewForm()">پیش‌نمایش</button>
+    <button class="btn btn-ghost btn-sm" onclick="openAllowedModal()">افراد مجاز</button>
+    <button class="btn btn-ghost btn-sm" onclick="openSettings()">تنظیمات</button>
+    <button class="btn btn-navy btn-sm" onclick="publishForm()">انتشار</button>
+    <a href="/dashboard/forms/{{ form.id }}/submissions" class="btn btn-gold btn-sm">پاسخ‌ها</a>
+  </div>
+</div>
+
+<!-- Step tabs -->
+<div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap" id="stepBar">
+  <!-- rendered by JS -->
+</div>
+
+<!-- 3-panel builder -->
+<div id="builderLayout" style="display:grid;grid-template-columns:220px 1fr 280px;gap:12px;align-items:start">
+
+  <!-- Palette -->
+  <div class="card" style="padding:12px;position:sticky;top:80px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--muted)">نوع فیلد</div>
+    <div id="palette">
+      {% set groups = [
+        ('متن', [('text','متن کوتاه'),('textarea','متن بلند'),('number','عدد'),('email','ایمیل'),('tel','تلفن'),('url','آدرس وب')]),
+        ('انتخاب', [('select','لیست کشویی'),('multi_select','چند انتخابه'),('radio','رادیو'),('checkbox','چک باکس'),('toggle','سوئیچ')]),
+        ('تاریخ/زمان', [('date','تاریخ'),('time','زمان'),('datetime','تاریخ و زمان'),('date_range','بازه تاریخ')]),
+        ('فایل', [('file','بارگذاری فایل'),('image','تصویر'),('signature','امضا')]),
+        ('پیشرفته', [('rating','امتیازدهی'),('slider','اسلایدر'),('color','انتخاب رنگ'),('map','موقعیت روی نقشه')]),
+        ('ایرانی', [('national_code','کد ملی'),('phone_ir','تلفن همراه'),('iban','شماره شبا')]),
+        ('لایه‌بندی', [('section','عنوان بخش'),('divider','خط جداکننده'),('html','محتوای HTML')]),
+      ] %}
+      {% for gname, types in groups %}
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:6px">{{ gname }}</div>
+        {% for ftype, flabel in types %}
+        <div class="palette-item" draggable="true"
+             data-type="{{ ftype }}" data-label="{{ flabel }}"
+             ondragstart="paletteDragStart(event)"
+             onclick="addFieldFromPalette('{{ ftype }}','{{ flabel }}')">
+          <span class="pi-icon">{{ {'text':'T','textarea':'¶','number':'#','email':'@','tel':'☎','url':'🔗','select':'▾','multi_select':'☑','radio':'◉','checkbox':'☐','toggle':'⇌','date':'📅','time':'🕐','datetime':'📆','date_range':'↔','file':'📎','image':'🖼','signature':'✒','rating':'★','slider':'⇔','color':'🎨','map':'📍','national_code':'🪪','phone_ir':'📱','iban':'🏦','section':'▪','divider':'—','html':'</>'}[ftype] or '·' }}</span>
+          {{ flabel }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div>
+    <div id="canvas" class="canvas-area"
+         ondragover="canvasDragOver(event)"
+         ondrop="canvasDrop(event)"
+         ondragleave="canvasDragLeave(event)">
+      <div class="canvas-empty" id="canvasEmpty">
+        <div style="font-size:48px;margin-bottom:8px">📋</div>
+        <div>فیلدها را از پنل چپ اینجا بکشید</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">یا روی هر نوع فیلد کلیک کنید</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:12px">
+      <button class="btn btn-ghost btn-sm" onclick="addStep()">+ افزودن مرحله</button>
+    </div>
+  </div>
+
+  <!-- Properties panel -->
+  <div class="card" style="padding:16px;position:sticky;top:80px" id="propPanel">
+    <div style="font-weight:600;margin-bottom:12px;font-size:14px">ویژگی‌های فیلد</div>
+    <div id="propContent" style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">
+      یک فیلد را از بوم انتخاب کنید
+    </div>
+  </div>
+
+</div>
+
+<!-- Settings modal -->
+<div class="modal" id="settingsModal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-head"><span class="modal-title">تنظیمات فرم</span><button class="modal-x" onclick="modal.close('settingsModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>عنوان فرم</label><input class="input" id="setTitle" value="{{ form.title }}"></div>
+      <div class="field"><label>توضیحات</label><textarea class="input" id="setDesc" rows="3">{{ form.description or '' }}</textarea></div>
+      <div class="field"><label>پیام موفقیت</label><textarea class="input" id="setSuccessMsg" rows="2" placeholder="پیامی که بعد از ثبت موفق نمایش داده می‌شود">{{ form.success_msg or '' }}</textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>وضعیت</label>
+          <select class="input" id="setStatus">
+            <option value="draft" {% if form.status=='draft' %}selected{% endif %}>پیش‌نویس</option>
+            <option value="published" {% if form.status=='published' %}selected{% endif %}>منتشر</option>
+            <option value="archived" {% if form.status=='archived' %}selected{% endif %}>بایگانی</option>
+          </select>
+        </div>
+        <div class="field"><label>دسترسی</label>
+          <select class="input" id="setPublic">
+            <option value="1" {% if form.is_public %}selected{% endif %}>عمومی</option>
+            <option value="0" {% if not form.is_public %}selected{% endif %}>فقط اعضا</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>حداکثر پاسخ (۰ = نامحدود)</label><input class="input" type="number" id="setMaxSub" value="{{ form.max_submissions or 0 }}"></div>
+      <div class="field" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="setRestrict" {% if form.restrict_access %}checked{% endif %} style="width:18px;height:18px">
+          فرم اختصاصی (فقط افراد لیست‌شده اجازه تکمیل دارند)
+        </label>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">
+          تطبیق بر اساس کد ملی یا موبایل — لیست افراد مجاز را از دکمهٔ «افراد مجاز» بالای صفحه مدیریت کنید.
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="saveSettings(this)">ذخیره</button>
+      <button class="btn btn-ghost" onclick="modal.close('settingsModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Allowed people modal -->
+<div class="modal" id="allowedModal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><span class="modal-title">افراد مجاز به تکمیل فرم</span><button class="modal-x" onclick="modal.close('allowedModal')">×</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <a class="btn btn-ghost btn-sm" href="/api/forms/allowed/template">دانلود اکسل نمونه</a>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('allowedFileInput').click()">وارد کردن از اکسل</button>
+        <input type="file" id="allowedFileInput" accept=".xlsx,.xls" style="display:none" onchange="importAllowedFile(this)">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div class="field" style="margin:0"><label>نام</label><input class="input" id="apName"></div>
+        <div class="field" style="margin:0"><label>کد ملی</label><input class="input mono" id="apNat" maxlength="10"></div>
+        <div class="field" style="margin:0"><label>موبایل</label><input class="input mono" id="apPhone" maxlength="11"></div>
+        <button class="btn btn-navy btn-sm" onclick="addAllowedPerson()">افزودن</button>
+      </div>
+      <div id="allowedList" style="max-height:320px;overflow:auto"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="modal.close('allowedModal')">بستن</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.palette-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:grab;font-size:13px;transition:background .1s;margin-bottom:3px;border:1px solid transparent}
+.palette-item:hover{background:var(--hover);border-color:var(--border)}
+.palette-item:active{cursor:grabbing}
+.pi-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.canvas-area{min-height:500px;border:2px dashed var(--border);border-radius:12px;padding:16px;transition:border-color .2s,background .2s}
+.canvas-area.drag-over{border-color:var(--gold);background:rgba(200,164,86,.05)}
+.canvas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:400px;color:var(--muted);font-size:14px}
+.field-block{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}
+.field-block:hover{border-color:var(--gold)}
+.field-block.selected{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,164,86,.2)}
+.field-block-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:grab}
+.field-block-body{padding:4px 14px 12px}
+.field-drag-handle{opacity:.4;cursor:grab;font-size:18px;margin-left:8px}
+.field-block-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.field-block:hover .field-block-actions{opacity:1}
+.field-block-actions button{border:none;background:none;cursor:pointer;padding:2px 6px;border-radius:4px;color:var(--muted);font-size:14px}
+.field-block-actions button:hover{background:var(--hover);color:var(--text)}
+.prop-row{margin-bottom:12px}
+.prop-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.step-tab{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;transition:all .15s}
+.step-tab.active{background:var(--navy,#0E1B32);color:#fff;border-color:var(--navy,#0E1B32)}
+.step-tab-add{padding:6px 14px;border-radius:20px;border:1px dashed var(--border);background:none;cursor:pointer;font-size:13px;color:var(--muted)}
+</style>
+
+<script>
+const FORM_ID   = {{ form.id }};
+let formData    = null;
+let steps       = [];
+let activeStep  = null;
+let selectedField = null;
+let dragSrcIdx  = null;
+let dragFromPalette = null;
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+async function loadForm(){
+  const r = await fetch(`/api/forms/${FORM_ID}`);
+  const d = await r.json();
+  formData = d.form;
+  steps    = formData.steps || [];
+  activeStep = steps[0]?.id || null;
+  updateStatusBadge();
+  renderStepBar();
+  renderCanvas();
+}
+
+function updateStatusBadge(){
+  const map = {draft:'پیش‌نویس',published:'منتشرشده',archived:'بایگانی'};
+  const col = {draft:'badge-warn',published:'badge-ok',archived:'badge-muted'};
+  const el  = document.getElementById('formStatusBadge');
+  el.textContent = map[formData.status] || formData.status;
+  el.className   = `badge ${col[formData.status]||''}`;
+}
+
+// ── Step bar ───────────────────────────────────────────────────────────────
+function renderStepBar(){
+  const bar = document.getElementById('stepBar');
+  bar.innerHTML = steps.map((s,i)=>`
+    <button class="step-tab ${s.id===activeStep?'active':''}" onclick="switchStep(${s.id})">
+      ${s.title||`مرحله ${i+1}`}
+    </button>
+  `).join('') + `<button class="step-tab-add" onclick="addStep()">+ مرحله</button>`;
+}
+
+function switchStep(sid){
+  activeStep = sid;
+  renderStepBar();
+  renderCanvas();
+  selectedField = null;
+  renderProps();
+}
+
+async function addStep(){
+  const r = await fetch(`/api/forms/${FORM_ID}/steps`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:`مرحله ${steps.length+1}`})});
+  const d = await r.json();
+  if(r.ok){ steps.push(d.step); activeStep=d.step.id; renderStepBar(); renderCanvas(); }
+  else showToast(d.error||'خطا','error');
+}
+
+// ── Canvas ─────────────────────────────────────────────────────────────────
+function currentFields(){
+  const step = steps.find(s=>s.id===activeStep);
+  return step?.fields || [];
+}
+
+function renderCanvas(){
+  const canvas = document.getElementById('canvas');
+  const fields  = currentFields();
+  const empty   = document.getElementById('canvasEmpty');
+  if(!fields.length){
+    empty.style.display='flex';
+    // remove all field-block elements
+    canvas.querySelectorAll('.field-block').forEach(el=>el.remove());
+    return;
+  }
+  empty.style.display='none';
+  // rebuild
+  canvas.querySelectorAll('.field-block').forEach(el=>el.remove());
+  fields.sort((a,b)=>a.order-b.order).forEach((f,i)=>{
+    const div = buildFieldBlock(f,i);
+    canvas.appendChild(div);
+  });
+}
+
+function buildFieldBlock(field, idx){
+  const div = document.createElement('div');
+  div.className = `field-block${field.id===selectedField?.id?' selected':''}`;
+  div.dataset.id = field.id;
+  div.draggable  = true;
+  div.innerHTML  = `
+    <div class="field-block-head">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="field-drag-handle" title="بکش">⣿</span>
+        <span style="font-weight:500;font-size:13px">${field.label}</span>
+        ${field.required?'<span style="color:#dc2626;font-size:11px">*</span>':''}
+        <span style="font-size:11px;color:var(--muted)">(${FIELD_TYPE_LABEL[field.field_type]||field.field_type})</span>
+      </div>
+      <div class="field-block-actions">
+        <button onclick="duplicateField(event,${field.id})" title="تکرار">⧉</button>
+        <button onclick="deleteField(event,${field.id})" title="حذف" style="color:#dc2626">✕</button>
+      </div>
+    </div>
+    <div class="field-block-body">${renderFieldPreview(field)}</div>
+  `;
+  div.addEventListener('click', (e)=>{ if(!e.target.closest('button')){ selectField(field); }});
+  div.addEventListener('dragstart', e=>{ dragSrcIdx=idx; dragFromPalette=null; e.dataTransfer.effectAllowed='move'; });
+  div.addEventListener('dragover',  e=>{ e.preventDefault(); div.style.borderColor='var(--gold)'; });
+  div.addEventListener('dragleave', e=>{ div.style.borderColor=''; });
+  div.addEventListener('drop',      e=>{ e.preventDefault(); div.style.borderColor=''; if(dragSrcIdx!==null) reorderDrop(idx); });
+  return div;
+}
+
+const FIELD_TYPE_LABEL = {text:'متن کوتاه',textarea:'متن بلند',number:'عدد',email:'ایمیل',tel:'تلفن',url:'وب',select:'لیست',multi_select:'چند انتخابه',radio:'رادیو',checkbox:'چک باکس',toggle:'سوئیچ',date:'تاریخ',time:'زمان',datetime:'تاریخ و زمان',date_range:'بازه تاریخ',file:'فایل',image:'تصویر',signature:'امضا',rating:'امتیاز',slider:'اسلایدر',color:'رنگ',map:'نقشه',national_code:'کد ملی',phone_ir:'موبایل',iban:'شبا',section:'عنوان بخش',divider:'جداکننده',html:'HTML'};
+
+function renderFieldPreview(f){
+  switch(f.field_type){
+    case 'textarea':    return `<textarea class="input" placeholder="${f.placeholder||f.label}" disabled rows="3" style="width:100%"></textarea>`;
+    case 'select':      return `<select class="input" disabled style="width:100%"><option>${f.placeholder||'انتخاب کنید'}</option></select>`;
+    case 'radio':       return (f.options||[]).slice(0,3).map(o=>`<label style="display:flex;gap:6px;margin:3px 0"><input type="radio" disabled>${typeof o==='string'?o:o.label||o}</label>`).join('');
+    case 'checkbox':    return (f.options||[]).slice(0,3).map(o=>`<label style="display:flex;gap:6px;margin:3px 0"><input type="checkbox" disabled>${typeof o==='string'?o:o.label||o}</label>`).join('');
+    case 'rating':      return `<div style="font-size:22px;letter-spacing:2px">★★★★★</div>`;
+    case 'section':     return `<div style="font-size:16px;font-weight:600;border-bottom:2px solid var(--gold);padding-bottom:4px">${f.label}</div>`;
+    case 'divider':     return `<hr style="border-color:var(--border)">`;
+    case 'toggle':      return `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" disabled>${f.label}</label>`;
+    case 'signature':   return `<div style="border:1px solid var(--border);border-radius:6px;height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px">ناحیه امضا</div>`;
+    case 'map':         return `<div style="border:1px solid var(--border);border-radius:6px;height:80px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px">📍 انتخاب موقعیت روی نقشه</div>`;
+    case 'file':        return `<div style="border:2px dashed var(--border);border-radius:6px;padding:12px;text-align:center;font-size:12px;color:var(--muted)">📎 انتخاب فایل</div>`;
+    case 'image':       return `<div style="border:2px dashed var(--border);border-radius:6px;padding:12px;text-align:center;font-size:12px;color:var(--muted)">🖼 بارگذاری تصویر</div>`;
+    case 'color':       return `<input type="color" disabled style="width:60px;height:36px;border-radius:6px">`;
+    case 'slider':      return `<input type="range" disabled style="width:100%">`;
+    case 'html':        return `<div style="padding:8px;background:var(--hover);border-radius:6px;font-size:12px;color:var(--muted)">محتوای HTML</div>`;
+    default:            return `<input class="input" type="text" placeholder="${f.placeholder||f.label}" disabled style="width:100%">`;
+  }
+}
+
+// ── Palette DnD ────────────────────────────────────────────────────────────
+function paletteDragStart(e){
+  dragFromPalette = {type: e.target.dataset.type, label: e.target.dataset.label};
+  dragSrcIdx = null;
+  e.dataTransfer.effectAllowed = 'copy';
+}
+
+function canvasDragOver(e){
+  e.preventDefault();
+  document.getElementById('canvas').classList.add('drag-over');
+}
+function canvasDragLeave(e){
+  if(!document.getElementById('canvas').contains(e.relatedTarget))
+    document.getElementById('canvas').classList.remove('drag-over');
+}
+async function canvasDrop(e){
+  e.preventDefault();
+  document.getElementById('canvas').classList.remove('drag-over');
+  if(dragFromPalette) await addFieldFromPalette(dragFromPalette.type, dragFromPalette.label);
+}
+
+async function addFieldFromPalette(type, label){
+  if(!activeStep){ showToast('ابتدا یک مرحله انتخاب کنید','error'); return; }
+  const fields = currentFields();
+  const r = await fetch(`/api/forms/${FORM_ID}/fields`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({step_id:activeStep,field_type:type,label,order:fields.length})
+  });
+  const d = await r.json();
+  if(r.ok){
+    const step = steps.find(s=>s.id===activeStep);
+    if(step) step.fields.push(d.field);
+    renderCanvas();
+    selectField(d.field);
+  } else showToast(d.error||'خطا','error');
+}
+
+// ── Canvas reorder ─────────────────────────────────────────────────────────
+async function reorderDrop(targetIdx){
+  const fields = currentFields();
+  if(dragSrcIdx===null || dragSrcIdx===targetIdx) return;
+  const moved = fields.splice(dragSrcIdx,1)[0];
+  fields.splice(targetIdx,0,moved);
+  fields.forEach((f,i)=>f.order=i);
+  renderCanvas();
+  await fetch(`/api/forms/${FORM_ID}/fields/reorder`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({fields:fields.map(f=>({id:f.id,order:f.order,step_id:f.step_id}))})
+  });
+  dragSrcIdx=null;
+}
+
+// ── Field selection & properties ───────────────────────────────────────────
+function selectField(field){
+  selectedField = field;
+  document.querySelectorAll('.field-block').forEach(el=>{
+    el.classList.toggle('selected', parseInt(el.dataset.id)===field.id);
+  });
+  renderProps();
+}
+
+function renderProps(){
+  const el = document.getElementById('propContent');
+  if(!selectedField){ el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">یک فیلد را انتخاب کنید</div>'; return; }
+  const f = selectedField;
+  const hasOptions = ['select','multi_select','radio','checkbox'].includes(f.field_type);
+  el.innerHTML=`
+    <div class="prop-row"><label>برچسب</label>
+      <input class="input" value="${escHtml(f.label)}" oninput="updateFieldProp('label',this.value)">
+    </div>
+    ${['section','divider','html'].includes(f.field_type)?'':
+    `<div class="prop-row"><label>متن راهنما (placeholder)</label>
+      <input class="input" value="${escHtml(f.placeholder||'')}" oninput="updateFieldProp('placeholder',this.value)">
+    </div>`}
+    <div class="prop-row"><label>توضیح فیلد</label>
+      <input class="input" value="${escHtml(f.help_text||'')}" oninput="updateFieldProp('help_text',this.value)">
+    </div>
+    <div class="prop-row"><label>عرض</label>
+      <select class="input" onchange="updateFieldProp('width',this.value)">
+        <option value="full" ${f.width==='full'?'selected':''}>کامل</option>
+        <option value="half" ${f.width==='half'?'selected':''}>نصف</option>
+        <option value="third" ${f.width==='third'?'selected':''}>یک‌سوم</option>
+      </select>
+    </div>
+    <div class="prop-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" ${f.required?'checked':''} onchange="updateFieldProp('required',this.checked)" style="width:16px;height:16px">
+      الزامی
+    </label></div>
+    ${hasOptions?`
+    <div class="prop-row"><label>گزینه‌ها (هر خط یک گزینه)</label>
+      <textarea class="input" rows="5" id="optTA" oninput="updateOptions(this.value)">${(f.options||[]).map(o=>typeof o==='string'?o:o.label||o).join('\n')}</textarea>
+    </div>`:''}
+    <div class="prop-row" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm" style="background:#dc2626;color:#fff;width:100%" onclick="deleteField(null,${f.id})">حذف فیلد</button>
+    </div>
+  `;
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let propSaveTimer = null;
+function updateFieldProp(key, val){
+  if(!selectedField) return;
+  selectedField[key] = val;
+  clearTimeout(propSaveTimer);
+  propSaveTimer = setTimeout(()=>saveFieldProp(key,val), 600);
+  renderCanvas();
+}
+
+async function saveFieldProp(key, val){
+  if(!selectedField) return;
+  const body = {[key]: val};
+  await fetch(`/api/forms/${FORM_ID}/fields/${selectedField.id}`,{
+    method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+  });
+}
+
+function updateOptions(raw){
+  if(!selectedField) return;
+  const opts = raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  selectedField.options = opts;
+  clearTimeout(propSaveTimer);
+  propSaveTimer = setTimeout(()=>saveFieldProp('options', opts), 800);
+}
+
+// ── Delete / Duplicate ─────────────────────────────────────────────────────
+async function deleteField(e, fid){
+  if(e) e.stopPropagation();
+  if(!confirm('این فیلد حذف شود؟')) return;
+  const r = await fetch(`/api/forms/${FORM_ID}/fields/${fid}`,{method:'DELETE'});
+  if(r.ok){
+    const step = steps.find(s=>s.id===activeStep);
+    if(step) step.fields = step.fields.filter(f=>f.id!==fid);
+    if(selectedField?.id===fid){ selectedField=null; renderProps(); }
+    renderCanvas();
+  } else showToast('خطا در حذف','error');
+}
+
+async function duplicateField(e, fid){
+  e.stopPropagation();
+  const field = currentFields().find(f=>f.id===fid);
+  if(!field) return;
+  const r = await fetch(`/api/forms/${FORM_ID}/fields`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({...field, id:undefined, order:field.order+1, label:field.label+' (کپی)', step_id:activeStep})
+  });
+  const d = await r.json();
+  if(r.ok){
+    const step = steps.find(s=>s.id===activeStep);
+    if(step) step.fields.push(d.field);
+    renderCanvas();
+  }
+}
+
+// ── Form settings & publish ────────────────────────────────────────────────
+function openSettings(){ modal.open('settingsModal'); }
+
+async function saveSettings(btn){
+  btn.disabled=true; btn.textContent='در حال ذخیره…';
+  const body = {
+    title:           document.getElementById('setTitle').value,
+    description:     document.getElementById('setDesc').value,
+    success_msg:     document.getElementById('setSuccessMsg').value,
+    status:          document.getElementById('setStatus').value,
+    is_public:       document.getElementById('setPublic').value==='1',
+    max_submissions: parseInt(document.getElementById('setMaxSub').value)||0,
+    restrict_access: document.getElementById('setRestrict').checked,
+  };
+  const r = await fetch(`/api/forms/${FORM_ID}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  if(r.ok){
+    formData = {...formData,...d.form};
+    document.getElementById('formTitleDisplay').textContent = formData.title;
+    updateStatusBadge();
+    modal.close('settingsModal');
+    showToast('تنظیمات ذخیره شد');
+  } else showToast(d.error||'خطا','error');
+  btn.disabled=false; btn.textContent='ذخیره';
+}
+
+async function publishForm(){
+  const r = await fetch(`/api/forms/${FORM_ID}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'published'})});
+  const d = await r.json();
+  if(r.ok){ formData.status='published'; updateStatusBadge(); showToast('فرم منتشر شد'); }
+  else showToast(d.error||'خطا','error');
+}
+
+function previewForm(){
+  window.open(`/dashboard/forms/public/${formData.slug}`,'_blank');
+}
+
+// ── Allowed people (فرم اختصاصی) ────────────────────────────────────────────
+function openAllowedModal(){ modal.open('allowedModal'); loadAllowedPeople(); }
+
+async function loadAllowedPeople(){
+  const r = await fetch(`/api/forms/${FORM_ID}/allowed`);
+  const d = await r.json();
+  const list = document.getElementById('allowedList');
+  if(!r.ok){ list.innerHTML = `<div style="color:var(--bad);font-size:13px">${d.error||'خطا'}</div>`; return; }
+  if(!d.people.length){
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">هنوز فردی اضافه نشده است</div>';
+    return;
+  }
+  list.innerHTML = d.people.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 4px;border-bottom:1px solid var(--border);font-size:13px">
+      <div>
+        <b>${p.full_name || '—'}</b>
+        <span style="color:var(--muted);margin-right:8px">${p.national_code||''}</span>
+        <span style="color:var(--muted);margin-right:8px">${p.phone||''}</span>
+        ${p.used_at ? '<span class="badge b-ok" style="margin-right:8px">ثبت شده</span>' : ''}
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="deleteAllowedPerson(${p.id})">حذف</button>
+    </div>`).join('');
+}
+
+async function addAllowedPerson(){
+  const full_name     = document.getElementById('apName').value.trim();
+  const national_code = document.getElementById('apNat').value.trim();
+  const phone         = document.getElementById('apPhone').value.trim();
+  if(!national_code && !phone){ showToast('حداقل کد ملی یا موبایل را وارد کنید','error'); return; }
+  const r = await fetch(`/api/forms/${FORM_ID}/allowed`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({full_name, national_code, phone}),
+  });
+  const d = await r.json();
+  if(r.ok){
+    document.getElementById('apName').value='';
+    document.getElementById('apNat').value='';
+    document.getElementById('apPhone').value='';
+    loadAllowedPeople();
+    showToast('فرد اضافه شد');
+  } else showToast(d.error||'خطا','error');
+}
+
+async function deleteAllowedPerson(pid){
+  if(!confirm('این فرد از لیست مجاز حذف شود؟')) return;
+  const r = await fetch(`/api/forms/${FORM_ID}/allowed/${pid}`, {method:'DELETE'});
+  if(r.ok){ loadAllowedPeople(); showToast('حذف شد'); }
+}
+
+async function importAllowedFile(input){
+  const file = input.files[0]; if(!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const r = await fetch(`/api/forms/${FORM_ID}/allowed/import`, {method:'POST', body: fd});
+  const d = await r.json();
+  input.value='';
+  if(r.ok){ showToast(`${d.created} نفر اضافه شد، ${d.skipped} مورد تکراری`); loadAllowedPeople(); }
+  else showToast(d.error||'خطا در وارد کردن فایل','error');
+}
+
+loadForm();
+</script>
+{% endblock %}

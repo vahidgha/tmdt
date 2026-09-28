@@ -1,0 +1,89 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">اعلان‌ها</h1>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm" onclick="markAll(this)">✓ همه خوانده‌شده</button>
+    {% if user.role == 'admin' %}
+    <button class="btn btn-gold" id="openSendModalBtn">
+ارسال اعلان</button>
+    {% endif %}
+  </div>
+</div>
+<div id="list" class="notif-list stagger">در حال بارگذاری…</div>
+
+{% if user.role == 'admin' %}
+<div class="modal" id="sendModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title">ارسال اعلان به همه اعضا</span><button class="modal-x" onclick="modal.close('sendModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>عنوان</label><input class="input" id="ntT"></div>
+      <div class="field"><label>متن</label><textarea class="input" rows="4" id="ntB"></textarea></div>
+      <div class="field"><label>نوع</label>
+        <select class="input" id="ntType">
+          <option value="info">اطلاع‌رسانی 🔵</option>
+          <option value="success">موفقیت ✅</option>
+          <option value="warning">هشدار ⚠️</option>
+          <option value="danger">فوری 🔴</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="send(this)">ارسال برای همه</button>
+      <button class="btn btn-ghost" onclick="modal.close('sendModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var b = document.getElementById('openSendModalBtn');
+  if (b) b.addEventListener('click', function() {
+    var m = document.getElementById('sendModal');
+    if (m) m.classList.add('open');
+  });
+});
+</script>
+<script>
+const COLORS = {info:'#86AADD', success:'var(--ok)', warning:'var(--warn)', danger:'var(--bad)'};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+async function load() {
+  const { notifications } = await fetch('/api/notifications').then(r => r.json());
+  const el = document.getElementById('list');
+  if (!notifications.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>اعلانی ندارید</div>';
+    return;
+  }
+  el.innerHTML = notifications.map((n, i) => `
+    <div class="notif-item ${n.read ? '' : 'unread'}" style="animation-delay:${i*40}ms">
+      <div class="notif-dot" style="background:${COLORS[n.type]||COLORS.info};color:${COLORS[n.type]||COLORS.info}"></div>
+      <div class="notif-body">
+        <div class="notif-title">${esc(n.title)}</div>
+        <div class="notif-text">${esc(n.body)}</div>
+        <div class="notif-ts">${new Date(n.created_at).toLocaleDateString('fa-IR')}</div>
+      </div>
+    </div>`).join('');
+}
+window.markAll = async function(btn) {
+  btnLoading(btn, true);
+  await fetch('/api/notifications/read', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  btnLoading(btn, false);
+  load(); _loadBadge();
+}
+window.send = async function(btn) {
+  btnLoading(btn, true);
+  const r = await fetch('/api/notifications/send', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({title:$v('ntT'), body:$v('ntB'), type:$v('ntType')})
+  });
+  btnLoading(btn, false);
+  if (r.ok) { modal.close('sendModal'); toast('اعلان ارسال شد'); }
+}
+load();
+</script>
+{% endblock %}

@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% set _title = settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') %}
+  {% set _desc  = settings.get('site_subtitle') or 'سامانه آنلاین ' ~ _title ~ ' — مدیریت دفترچه مالکیت، پروژه‌های ساختمانی، اطلاعیه‌ها و خدمات اعضا.' %}
+  {% set _url   = request.url_root.rstrip('/') + '/' %}
+  {% set _logo_url = (_url ~ 'uploads/' ~ settings.site_logo) if settings.get('site_logo') else '' %}
+  <title>{{ _title }}</title>
+  <meta name="description" content="{{ _desc }}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{{ _url }}">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fa_IR">
+  <meta property="og:url" content="{{ _url }}">
+  <meta property="og:site_name" content="{{ _title }}">
+  <meta property="og:title" content="{{ _title }}">
+  <meta property="og:description" content="{{ _desc }}">
+  {% if _logo_url %}<meta property="og:image" content="{{ _logo_url }}">{% endif %}
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary{{ '_large_image' if _logo_url else '' }}">
+  <meta name="twitter:title" content="{{ _title }}">
+  <meta name="twitter:description" content="{{ _desc }}">
+  {% if _logo_url %}<meta name="twitter:image" content="{{ _logo_url }}">{% endif %}
+
+  {% if settings.get('site_logo') %}
+  <link rel="apple-touch-icon" href="/uploads/{{ settings.site_logo }}">
+  <link rel="icon" type="image/png" href="/uploads/{{ settings.site_logo }}">
+  {% else %}
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  {% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/public.css?v={{ app_version }}">
+
+  <!-- Structured data — سازمان -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": {{ _title|tojson }},
+    "url": {{ _url|tojson }}
+    {%- if _logo_url %},
+    "logo": {{ _logo_url|tojson }}
+    {%- endif %}
+    {%- if settings.get('site_phone') %},
+    "telephone": {{ settings.site_phone|tojson }}
+    {%- endif %}
+    {%- if settings.get('site_address') %},
+    "address": {
+      "@type": "PostalAddress",
+      "addressCountry": "IR",
+      "streetAddress": {{ settings.site_address|tojson }}
+    }
+    {%- endif %}
+  }
+  </script>
+</head>
+<body class="pub">
+
+<!-- ── Navbar ────────────────────────────────────────────── -->
+<div class="pub-nav-wrap">
+  <nav class="pub-nav liquid-glass" id="pubNav">
+    <div class="pub-nav-inner">
+      <div class="pub-nav-brand">
+        <div class="pub-nav-logo">
+          {% if settings.get('site_logo') %}
+          <img src="/uploads/{{ settings.site_logo }}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">
+          {% else %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round">
+            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
+          </svg>
+          {% endif %}
+        </div>
+        <span class="pub-nav-name">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</span>
+      </div>
+      <div class="pub-nav-links">
+        <a href="/marketplace" class="pub-nav-link">بازار خرید و فروش</a>
+        <a href="/about" class="pub-nav-link">درباره ما</a>
+      </div>
+      <a href="/login" class="pub-nav-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+        </svg>
+        ورود اعضا
+      </a>
+    </div>
+  </nav>
+</div>
+
+<!-- ── Hero / Slider ─────────────────────────────────────── -->
+<section class="hero" id="hero">
+  <canvas id="scene"></canvas>
+  <div class="hero-bar top" id="heroBarTop"></div>
+  <div class="hero-bar bottom" id="heroBarBottom"></div>
+
+  {% if slides %}
+  <!-- اسلایدها (بدون overlay — ویدیو/تصویر خام) -->
+  <div class="slides-wrap" id="slidesWrap">
+    {% for s in slides %}
+    <div class="slide {% if loop.first %}on{% endif %}"
+         {% if s.media_type == 'video' and s.video_path %}
+           style="background:{{ s.bg_color }}"
+         {% elif s.image_path %}
+           style="background-image:url('/uploads/{{ s.image_path }}')"
+         {% else %}
+           style="background:{{ s.bg_color }}"
+         {% endif %}>
+      {% if s.media_type == 'video' and s.video_path %}
+      <video
+        src="/uploads/{{ s.video_path }}"
+        class="slide-video"
+        autoplay muted loop playsinline
+        preload="metadata">
+      </video>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- محتوای hero — پایین صفحه، دو ستونه -->
+  <div class="hero-content">
+    <div class="hero-main">
+      <h1 class="hero-h1" id="heroTitle" data-text="{{ slides[0].title }}">{{ slides[0].title }}</h1>
+      <p class="hero-p" id="heroSub">{{ slides[0].subtitle or '' }}</p>
+      <div class="hero-actions" id="heroActions">
+        <a href="/login" class="hero-btn-solid">ورود اعضا</a>
+        <a href="#projects" class="hero-btn-glass liquid-glass">مشاهده پروژه‌ها</a>
+      </div>
+    </div>
+    <div class="hero-tag-wrap" id="heroTagWrap">
+      <div class="hero-tag liquid-glass">سرمایه‌گذاری. ساخت‌وساز. مشاوره.</div>
+    </div>
+  </div>
+
+  {% if slides|length > 1 %}
+  <button class="s-btn s-next" onclick="slide(-1)" aria-label="قبلی">❮</button>
+  <button class="s-btn s-prev" onclick="slide(1)"  aria-label="بعدی">❯</button>
+  <div class="slider-dots" id="dots">
+    {% for s in slides %}
+    <button class="sdot {% if loop.first %}on{% endif %}" onclick="goSlide({{ loop.index0 }})"></button>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <!-- بدون اسلاید — Hero ساده -->
+  <div class="hero-content">
+    <div class="hero-main">
+      <h1 class="hero-h1" id="heroTitle" data-text="{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}">{{ settings.get('site_title','هیئت امنای مسکن دادگستری زنجان') }}</h1>
+      <p class="hero-p" id="heroSub">{{ settings.get('site_subtitle','سامانه آنلاین مدیریت دفترچه مالکیت') }}</p>
+      <div class="hero-actions" id="heroActions">
+        <a href="/login" class="hero-btn-solid">ورود اعضا</a>
+        <a href="#projects" class="hero-btn-glass liquid-glass">مشاهده پروژه‌ها</a>
+      </div>
+    </div>
+    <div class="hero-tag-wrap" id="heroTagWrap">
+      <div class="hero-tag liquid-glass">سرمایه‌گذاری. ساخت‌وساز. مشاوره.</div>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<!-- ── Leaders ────────────────────────────────────────────── -->
+{% if settings.get('exec_manager') or settings.get('board_rep') %}
+<section class="pub-section leaders-section">
+  <div class="pub-container">
+    <div class="sec-kicker reveal">👥 مسئولین</div>
+    <h2 class="sec-h2 reveal" style="transition-delay:.08s">هیئت <span>رئیسه</span></h2>
+    <div class="leaders-grid">
+      {% if settings.get('exec_manager') %}
+      <div class="leader-card reveal" style="transition-delay:.05s">
+        <div class="leader-photo">
+          {% if settings.get('exec_photo') %}
+          <img src="/uploads/{{ settings.get('exec_photo') }}" alt="{{ settings.get('exec_manager') }}">
+          {% else %}
+          <div class="leader-ph">{{ settings.get('exec_manager','')[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="leader-card-name">{{ settings.get('exec_manager') }}</div>
+        <div class="leader-card-role">مدیر اجرایی</div>
+      </div>
+      {% endif %}
+      {% if settings.get('board_rep') %}
+      <div class="leader-card reveal" style="transition-delay:.12s">
+        <div class="leader-photo">
+          {% if settings.get('board_photo') %}
+          <img src="/uploads/{{ settings.get('board_photo') }}" alt="{{ settings.get('board_rep') }}">
+          {% else %}
+          <div class="leader-ph">{{ settings.get('board_rep','')[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="leader-card-name">{{ settings.get('board_rep') }}</div>
+        <div class="leader-card-role">نماینده هیئت رئیسه</div>
+      </div>
+      {% endif %}
+      {% if settings.get('third_name') %}
+      <div class="leader-card reveal" style="transition-delay:.2s">
+        <div class="leader-photo">
+          {% if settings.get('third_photo') %}
+          <img src="/uploads/{{ settings.get('third_photo') }}" alt="{{ settings.get('third_name') }}">
+          {% else %}
+          <div class="leader-ph">{{ settings.get('third_name','')[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="leader-card-name">{{ settings.get('third_name') }}</div>
+        <div class="leader-card-role">{{ settings.get('third_role','عضو هیئت رئیسه') }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Announcements ─────────────────────────────────────── -->
+{% if announcements %}
+<section class="pub-section">
+  <div class="pub-container">
+    <div class="sec-kicker reveal">📢 اطلاعیه‌ها</div>
+    <h2 class="sec-h2 reveal" style="transition-delay:.08s">آخرین <span>اخبار</span> هیئت</h2>
+    <div class="ann-list">
+      {% for a in announcements %}
+      <div class="ann-item reveal" style="transition-delay:{{ (loop.index0 * 0.08) | round(2) }}s">
+        <div class="ann-head" onclick="this.parentElement.classList.toggle('open')">
+          <div>
+            <div class="ann-title">{{ a.title }}</div>
+            <div class="ann-date">{{ a.date.strftime('%Y/%m/%d') }}</div>
+          </div>
+          <span class="ann-arrow">▾</span>
+        </div>
+        <div class="ann-body">
+          {{ a.body }}
+          {% if a.image_path %}
+          <div class="ann-img-wrap">
+            <img src="/uploads/{{ a.image_path }}" alt="{{ a.title }}" class="ann-img" loading="lazy">
+          </div>
+          {% endif %}
+          {% if a.media %}
+          <div class="ann-media-grid">
+            {% for m in a.media %}
+            {% if m.file_type == 'video' %}
+            <div class="ann-media-item ann-media-video" onclick="openAnnPubLightbox('video','/uploads/{{ m.file_path }}')">
+              <div class="ann-media-play">▶</div>
+              {% if m.caption %}<div class="ann-media-cap">{{ m.caption }}</div>{% endif %}
+            </div>
+            {% else %}
+            <div class="ann-media-item" style="background-image:url('/uploads/{{ m.file_path }}')" onclick="openAnnPubLightbox('image','/uploads/{{ m.file_path }}')">
+              {% if m.caption %}<div class="ann-media-cap">{{ m.caption }}</div>{% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Projects ──────────────────────────────────────────── -->
+{% if projects %}
+<section class="pub-section sec-alt" id="projects">
+  <div class="pub-container">
+    <div class="sec-kicker reveal">🏗 پروژه‌ها</div>
+    <h2 class="sec-h2 reveal" style="transition-delay:.08s">پروژه‌های <span>هیئت</span></h2>
+    <div class="proj-grid">
+      {% for p in projects %}
+      <div class="proj-card reveal" style="transition-delay:{{ (loop.index0 * 0.1) | round(2) }}s">
+        <div class="proj-thumb">
+          {% if p.image_path %}
+          <img src="/uploads/{{ p.image_path }}" alt="{{ p.name }}" loading="lazy">
+          {% else %}
+          <div class="proj-ph">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#B8945A" stroke-width="1.2" stroke-linecap="round" opacity=".5">
+              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
+            </svg>
+          </div>
+          {% endif %}
+          <span class="proj-status status-{{ p.status }}">
+            {{ {'active':'در حال اجرا','completed':'تکمیل‌شده','upcoming':'آینده'}.get(p.status, p.status) }}
+          </span>
+        </div>
+        <div class="proj-body">
+          <h3>{{ p.name }}</h3>
+          {% if p.description %}<p>{{ p.description }}</p>{% endif %}
+          <div class="proj-tags">
+            {% if p.address %}<span class="proj-tag">📍 {{ p.address }}</span>{% endif %}
+            {% if p.total_booklets %}<span class="proj-tag">📋 {{ p.total_booklets }} واحد</span>{% endif %}
+            {% if p.start_date %}<span class="proj-tag">📅 شروع: {{ p.start_date }}</span>{% endif %}
+            {% if p.end_date %}<span class="proj-tag">🏁 پایان: {{ p.end_date }}</span>{% endif %}
+            {% if p.location %}<span class="proj-tag">🗺 {{ p.location }}</span>{% endif %}
+          </div>
+          {% if p.map_lat and p.map_lon %}
+          {% set _lat = p.map_lat|float %}
+          {% set _lon = p.map_lon|float %}
+          {% set _d = 0.01 %}
+          <div class="proj-map">
+            <iframe
+              src="https://www.openstreetmap.org/export/embed.html?bbox={{ (_lon-_d)|string }}%2C{{ (_lat-_d)|string }}%2C{{ (_lon+_d)|string }}%2C{{ (_lat+_d)|string }}&layer=mapnik&marker={{ _lat }}%2C{{ _lon }}"
+              width="100%" height="220" style="border:0;border-radius:12px" loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <a href="https://www.openstreetmap.org/?mlat={{ _lat }}&mlon={{ _lon }}#map=15/{{ _lat }}/{{ _lon }}"
+               target="_blank" rel="noopener" style="font-size:11px;color:#8a8f98;display:block;margin-top:4px;text-align:center">
+              مشاهده نقشه بزرگ‌تر
+            </a>
+          </div>
+          {% endif %}
+          {% if p.members %}
+          <div class="proj-members">
+            <div class="proj-members-title">اعضای هیئت</div>
+            {% for m in p.members %}
+            <div class="proj-member-row">
+              {% if m.photo_path %}
+            <img src="/uploads/{{ m.photo_path }}" class="proj-member-avatar" style="object-fit:cover" alt="{{ m.full_name }}">
+            {% else %}
+            <div class="proj-member-avatar">{{ m.full_name[0] }}</div>
+            {% endif %}
+              <div>
+                <div class="proj-member-name">{{ m.full_name }}</div>
+                <div class="proj-member-role">{{ m.role }}</div>
+              </div>
+              {% if m.phone %}
+              <div class="proj-member-phone">{{ m.phone }}</div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% if p.gallery %}
+          <div class="proj-gallery">
+            <div class="proj-gallery-title">گالری پروژه</div>
+            <div class="proj-gallery-grid">
+              {% for g in p.gallery %}
+              {% if g.file_type == 'video' %}
+              <div class="proj-gallery-item proj-gallery-video" onclick="openProjLightbox('video','/uploads/{{ g.file_path }}','{{ g.caption or '' }}')">
+                <div class="proj-gallery-play">▶</div>
+              </div>
+              {% else %}
+              <div class="proj-gallery-item" style="background-image:url('/uploads/{{ g.file_path }}')" onclick="openProjLightbox('image','/uploads/{{ g.file_path }}','{{ g.caption or '' }}')">
+              </div>
+              {% endif %}
+              {% if g.caption %}<div class="proj-gallery-cap">{{ g.caption }}</div>{% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Recent Marketplace Listings ──────────────────────── -->
+{% if recent_listings %}
+<section class="pub-section" id="marketplace-preview">
+  <div class="pub-container">
+    <div class="sec-kicker reveal">🏬 بازار خرید و فروش</div>
+    <h2 class="sec-h2 reveal" style="transition-delay:.08s">آخرین <span>آگهی‌ها</span></h2>
+    <p class="sec-sub reveal" style="transition-delay:.14s">دفترچه‌ها و امتیازات تأییدشده اعضا برای خرید و فروش</p>
+    <div class="rl-grid">
+      {% for l in recent_listings %}
+      <a class="rl-card reveal" style="transition-delay:{{ (loop.index0 * 0.08)|round(2) }}s" href="/marketplace/{{ l.slug }}">
+        <div class="rl-card-top">
+          <span class="rl-card-badge">✓ تأیید شده</span>
+          <div class="rl-card-title">{{ l.title }}</div>
+        </div>
+        <div class="rl-card-body">
+          <div class="rl-card-price">{{ "{:,}".format(l.price) }} تومان</div>
+          <div class="rl-card-meta">{{ l.project.name if l.project else '' }}{% if l.area %} — {{ l.area }} متر{% endif %}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="rl-more-wrap">
+      <a href="/marketplace" class="rl-more-btn">مشاهده همه آگهی‌ها ←</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Public Forms ──────────────────────────────────────── -->
+{% if public_forms %}
+<section class="pub-section" id="public-forms">
+  <div class="pub-container">
+    <div class="sec-kicker reveal">📋 فرم‌ها</div>
+    <h2 class="sec-h2 reveal" style="transition-delay:.08s">فرم‌های <span>عمومی</span></h2>
+    <p class="sec-sub reveal" style="transition-delay:.14s">فرم‌های زیر را تکمیل و ارسال نمایید</p>
+    <div class="forms-grid">
+      {% for f in public_forms %}
+      <a href="/dashboard/forms/public/{{ f.slug }}" class="form-card reveal" style="transition-delay:{{ (loop.index0 * 0.08)|round(2) }}s">
+        <div class="form-card-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <path d="M9 12h6M9 16h4"/>
+          </svg>
+        </div>
+        <div class="form-card-body">
+          <div class="form-card-title">{{ f.title }}</div>
+          {% if f.description %}
+          <div class="form-card-desc">{{ f.description }}</div>
+          {% endif %}
+        </div>
+        <div class="form-card-arrow">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M12 5l-7 7 7 7"/></svg>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Footer ────────────────────────────────────────────── -->
+<footer class="pub-footer">
+  <div class="pub-container">
+    <div class="footer-top reveal">
+      <div>
+        <div class="footer-brand">
+          <div class="footer-logo">
+            {% if settings.get('site_logo') %}
+            <img src="/uploads/{{ settings.site_logo }}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">
+            {% else %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round">
+              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
+            </svg>
+            {% endif %}
+          </div>
+          <span class="footer-brand-name">{{ settings.get('site_title','هیئت امنای مسکن') }}</span>
+        </div>
+        <div class="footer-info">
+          {% if settings.get('site_address') %}<div>📍 {{ settings.site_address }}</div>{% endif %}
+          {% if settings.get('site_phone') %}<div>📞 {{ settings.site_phone }}</div>{% endif %}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <a href="/marketplace" style="color:#D9D3C2;font-size:13px;font-weight:600;text-decoration:none">بازار خرید و فروش</a>
+        <a href="/about" style="color:#D9D3C2;font-size:13px;font-weight:600;text-decoration:none">درباره ما</a>
+        <a href="/login" class="pub-nav-btn" style="align-self:center">ورود اعضا</a>
+      </div>
+    </div>
+    <div class="footer-copy">
+      تمامی حقوق مادی و معنوی این سامانه محفوظ و متعلق به <a href="https://Noyan.team" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline"><strong>نویان فناور آریا</strong></a> است.
+      <span style="opacity:.6;font-size:11px;margin-right:8px">نسخه {{ app_version }}</span>
+      این سامانه به سفارش و به افتخار مدیرعامل تعاونی مسکن دادگستری کل استان زنجان،
+      جناب آقای <strong>علی غفاری</strong>، طراحی و تقدیم گردیده است.
+    </div>
+  </div>
+</footer>
+
+<!-- Gallery Lightbox -->
+<div id="projLightbox" onclick="if(event.target===this)closeProjLightbox()">
+  <button id="projLbClose" onclick="closeProjLightbox()">×</button>
+  <img id="projLbImg" src="" alt="">
+  <video id="projLbVid" src="" controls></video>
+  <div id="projLbCap"></div>
+</div>
+
+<!-- Ann lightbox -->
+<div id="annPubLightbox" onclick="if(event.target===this)closeAnnPubLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10000;align-items:center;justify-content:center">
+  <button onclick="closeAnnPubLightbox()" style="position:absolute;top:16px;left:16px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer">×</button>
+  <img id="annPubLbImg" src="" style="display:none;max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain">
+  <video id="annPubLbVid" src="" controls style="display:none;max-width:90vw;max-height:85vh;border-radius:10px"></video>
+</div>
+
+<script src="/static/js/scene.js"></script>
+<script>
+/* ── Animated heading (word-by-word) + fade-ins ──────────
+   نکته: حروف فارسی به‌صورت زمینه‌ای (contextual) به هم می‌چسبند؛
+   تقسیم متن به تک‌تک حروف باعث می‌شود اتصال حروف بشکند و فونت
+   بهم‌ریخته دیده شود. به همین دلیل انیمیشن روی واحد «کلمه» اجرا
+   می‌شود نه «حرف»، تا شکل صحیح حروف فارسی حفظ شود. */
+function renderAnimatedHeading(el, text) {
+  const WORD_DELAY = 60, START_DELAY = 200;
+  el.innerHTML = '';
+  const lines = text.split('\n');
+  lines.forEach((line, lineIndex) => {
+    if (lineIndex > 0) el.appendChild(document.createElement('br'));
+    const words = line.split(' ');
+    words.forEach((word, wordIndex) => {
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.textContent = word + (wordIndex < words.length - 1 ? ' ' : '');
+      span.style.transitionDelay = (START_DELAY + lineIndex * words.length * WORD_DELAY + wordIndex * WORD_DELAY) + 'ms';
+      el.appendChild(span);
+    });
+  });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.querySelectorAll('.char').forEach(s => s.classList.add('in'));
+  }));
+}
+
+const heroTitleEl = document.getElementById('heroTitle');
+if (heroTitleEl) renderAnimatedHeading(heroTitleEl, heroTitleEl.dataset.text || '');
+
+[['heroSub', 800], ['heroActions', 1200], ['heroTagWrap', 1400]].forEach(([id, delay]) => {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.classList.add('in'), delay);
+});
+
+/* ── Slider ─────────────────────────────────────────── */
+const slides  = document.querySelectorAll('.slide');
+const dots    = document.querySelectorAll('.sdot');
+const titleEl = document.getElementById('heroTitle');
+const subEl   = document.getElementById('heroSub');
+
+// data stored in template as JSON for JS access
+const slideData = [
+  {% for s in slides %}
+  { title: {{ s.title | tojson }}, sub: {{ (s.subtitle or '') | tojson }}, media_type: {{ (s.media_type or 'image') | tojson }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+/* ── Letterbox bars reveal ──────────────────────────── */
+document.getElementById('heroBarTop')?.classList.add('in');
+document.getElementById('heroBarBottom')?.classList.add('in');
+
+/* ── Scroll reveal (IntersectionObserver) ─────────────── */
+const revealEls = document.querySelectorAll('.reveal');
+if ('IntersectionObserver' in window && revealEls.length) {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  revealEls.forEach(el => io.observe(el));
+} else {
+  revealEls.forEach(el => el.classList.add('in'));
+}
+
+/* ── Cinematic scroll parallax on hero ────────────────── */
+const heroSection = document.getElementById('hero');
+const slidesWrap   = document.getElementById('slidesWrap');
+let ticking = false;
+window.addEventListener('scroll', () => {
+  if (ticking || !heroSection) return;
+  ticking = true;
+  requestAnimationFrame(() => {
+    const y = window.scrollY;
+    const heroH = heroSection.offsetHeight || 1;
+    if (y < heroH) {
+      if (slidesWrap) slidesWrap.style.transform = `translateY(${y * 0.18}px)`;
+      const content = document.querySelector('.hero-content');
+      if (content) {
+        content.style.transform = `translateY(${y * 0.10}px)`;
+        content.style.opacity = String(Math.max(0, 1 - y / (heroH * 1.4)));
+      }
+    }
+    ticking = false;
+  });
+}, { passive: true });
+
+let cur = 0, timer;
+const SLIDE_INTERVAL = 5500;
+
+function resetTimer() {
+  if (timer) clearInterval(timer);
+  if (slides.length > 1) timer = setInterval(() => goSlide(cur + 1), SLIDE_INTERVAL);
+}
+
+window.goSlide = function(n) {
+  if (!slides.length) return;
+  slides[cur].classList.remove('on');
+  dots[cur]?.classList.remove('on');
+  cur = ((n % slides.length) + slides.length) % slides.length;
+  slides[cur].classList.add('on');
+  dots[cur]?.classList.add('on');
+
+  // Update text with fade
+  if (titleEl && slideData[cur]) {
+    titleEl.style.opacity = '0';
+    subEl.style.opacity   = '0';
+    setTimeout(() => {
+      titleEl.dataset.text  = slideData[cur].title;
+      subEl.textContent     = slideData[cur].sub;
+      titleEl.style.opacity = '1';
+      subEl.style.opacity   = '1';
+      renderAnimatedHeading(titleEl, slideData[cur].title);
+    }, 250);
+  }
+  resetTimer();
+}
+
+window.slide = function(d) { goSlide(cur + d); }
+
+resetTimer();
+
+/* ── Project Gallery Lightbox ─────────────── */
+window.openProjLightbox = function(type, url, caption) {
+  var lb  = document.getElementById('projLightbox');
+  var img = document.getElementById('projLbImg');
+  var vid = document.getElementById('projLbVid');
+  img.style.display = 'none'; vid.style.display = 'none';
+  if (type === 'video') { vid.src = url; vid.style.display = ''; }
+  else                  { img.src = url; img.style.display = ''; }
+  document.getElementById('projLbCap').textContent = caption || '';
+  lb.classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+window.closeProjLightbox = function() {
+  var vid = document.getElementById('projLbVid');
+  if (vid) { vid.pause(); vid.src = ''; }
+  document.getElementById('projLightbox').classList.remove('open');
+  document.body.style.overflow = '';
+};
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closeProjLightbox(); closeAnnPubLightbox(); }
+});
+
+window.openAnnPubLightbox = function(type, url) {
+  var lb  = document.getElementById('annPubLightbox');
+  var img = document.getElementById('annPubLbImg');
+  var vid = document.getElementById('annPubLbVid');
+  img.style.display = 'none'; vid.style.display = 'none';
+  if (type === 'video') { vid.src = url; vid.style.display = ''; }
+  else                  { img.src = url; img.style.display = ''; }
+  lb.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+};
+window.closeAnnPubLightbox = function() {
+  var vid = document.getElementById('annPubLbVid');
+  if (vid) { vid.pause(); vid.src = ''; }
+  document.getElementById('annPubLightbox').style.display = 'none';
+  document.body.style.overflow = '';
+};
+
+</script>
+</body>
+</html>

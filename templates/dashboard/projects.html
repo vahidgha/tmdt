@@ -1,0 +1,540 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">مدیریت پروژه‌ها</h1>
+  <button class="btn btn-gold" id="btnNewProj" onclick="openProj()">+ پروژه جدید</button>
+</div>
+
+<div id="projGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px"></div>
+
+<!-- Modal -->
+<div class="modal" id="addProj">
+  <div class="modal-box" style="max-width:620px">
+    <div class="modal-head"><span class="modal-title" id="projModalTitle">پروژه جدید</span><button class="modal-x" onclick="document.getElementById('addProj').classList.remove('open')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="projEditId">
+      <div class="grid-2">
+        <div class="field span-2"><label>نام پروژه *</label><input class="input" id="pjName" placeholder="مثلاً: مجتمع مسکونی بهارستان"></div>
+        <div class="field span-2"><label>آدرس پروژه *</label><input class="input" id="pjAddr" placeholder="آدرس کامل محل پروژه"></div>
+        <div class="field"><label>منطقه / شهرک</label><input class="input" id="pjLoc" placeholder="مثلاً: شهرک گلستان"></div>
+        <div class="field"><label>تعداد کل دفترچه‌ها *</label><input class="input" type="number" id="pjTotalB" placeholder="مثلاً: ۵۰"></div>
+        <div class="field"><label>تاریخ شروع</label><input class="input" id="pjStart" placeholder="۱۴۰۳/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>تاریخ تحویل</label><input class="input" id="pjEnd" placeholder="۱۴۰۶/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>وضعیت</label>
+          <select class="input" id="pjStatus">
+            <option value="active">در حال اجرا</option>
+            <option value="upcoming">آینده</option>
+            <option value="completed">تکمیل‌شده</option>
+          </select>
+        </div>
+        <div class="field"><label>ترتیب نمایش</label><input class="input" type="number" id="pjOrder" value="0"></div>
+        <div class="field span-2"><label>توضیحات</label><textarea class="input" id="pjDesc" rows="3"></textarea></div>
+
+        <div class="field"><label>عرض جغرافیایی (Latitude)</label><input class="input mono" id="pjLat" placeholder="مثلاً: 36.6736"></div>
+        <div class="field"><label>طول جغرافیایی (Longitude)</label><input class="input mono" id="pjLon" placeholder="مثلاً: 48.4787"></div>
+
+        <div class="field span-2">
+          <label>تصویر پروژه (اختیاری)</label>
+          <div class="img-upload-wrap">
+            <div class="img-upload-input">
+              <input type="file" id="pjImg" accept="image/*" onchange="previewImg(this,'pjPreview')">
+              <div class="img-preview-box" id="pjPreview">
+                <span style="font-size:28px">🏗</span>
+                <span style="font-size:12px;color:var(--muted)">کلیک کنید یا فایل بکشید</span>
+              </div>
+            </div>
+            <div class="img-guide">
+              <div class="img-guide-title">📐 راهنمای تصویر پروژه</div>
+              <ul class="img-guide-list">
+                <li><b>سایز ایده‌آل:</b> <code>800 × 500</code> پیکسل</li>
+                <li><b>حداقل:</b> <code>600 × 400</code> پیکسل</li>
+                <li><b>نسبت تصویر:</b> 16:10 یا 3:2</li>
+                <li><b>فرمت:</b> JPG یا WebP</li>
+                <li><b>حجم:</b> حداکثر ۳۰۰ کیلوبایت</li>
+              </ul>
+              <div class="img-guide-tips">
+                <div class="img-guide-tip tip-do">✓ نمای کلی ساختمان یا محل پروژه مناسب‌ترین تصویر است</div>
+                <div class="img-guide-tip tip-do">✓ تصویر روشن و با کنتراست بالا توصیه می‌شود</div>
+                <div class="img-guide-tip tip-dont">✗ از عکس‌های خصوصی یا چهره افراد استفاده نکن</div>
+              </div>
+              <a href="https://squoosh.app" target="_blank" class="img-guide-link">🔗 فشرده‌سازی رایگان در squoosh.app</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="saveProj()">ذخیره پروژه</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('addProj').classList.remove('open')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Gallery Modal -->
+<div class="modal" id="galleryModal">
+  <div class="modal-box" style="max-width:780px">
+    <div class="modal-head">
+      <span class="modal-title" id="galleryModalTitle">گالری پروژه</span>
+      <button class="modal-x" onclick="document.getElementById('galleryModal').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="galleryProjId">
+
+      <!-- Upload form (admin only) -->
+      <div id="galleryUploadArea" style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:800;color:var(--muted2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.4px">افزودن تصویر یا ویدیو</div>
+        <div class="grid-2">
+          <div class="field span-2">
+            <label>انتخاب فایل (تصویر یا ویدیو) *</label>
+            <input type="file" id="gFile" class="input" accept="image/*,video/*">
+          </div>
+          <div class="field span-2">
+            <label>توضیح (اختیاری)</label>
+            <input type="text" id="gCaption" class="input" placeholder="مثلاً: نمای شرقی ساختمان">
+          </div>
+        </div>
+        <div id="gErr" class="alert alert-bad" style="display:none"></div>
+        <button class="btn btn-navy" style="margin-top:8px" onclick="uploadGallery(this)">آپلود</button>
+      </div>
+
+      <!-- Gallery grid -->
+      <div id="galleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;flex-direction:column" onclick="closeLightbox(event)">
+  <button onclick="closeLightbox()" style="position:absolute;top:16px;left:16px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;z-index:1">×</button>
+  <img id="lbImg" src="" style="display:none;max-width:90vw;max-height:80vh;border-radius:10px;object-fit:contain">
+  <video id="lbVid" src="" controls style="display:none;max-width:90vw;max-height:80vh;border-radius:10px"></video>
+  <div id="lbCaption" style="color:#ddd;font-size:13px;margin-top:12px;text-align:center;padding:0 20px"></div>
+</div>
+
+<!-- Members Modal -->
+<div class="modal" id="membersModal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-head">
+      <span class="modal-title" id="membersModalTitle">اعضای هیئت</span>
+      <button class="modal-x" onclick="document.getElementById('membersModal').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="membersProjId">
+
+      <!-- Add member form -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:800;color:var(--muted2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.4px">افزودن عضو جدید</div>
+        <div class="grid-2">
+          <div class="field span-2">
+            <label>نام و نام‌خانوادگی *</label>
+            <input class="input" id="mName" placeholder="مثلاً: علی محمدی">
+          </div>
+          <div class="field">
+            <label>سمت</label>
+            <select class="input" id="mRole">
+              <option value="مدیر اجرایی">مدیر اجرایی</option>
+              <option value="رئیس هیئت اجرایی">رئیس هیئت اجرایی</option>
+              <option value="مدیر هیئت امنا">مدیر هیئت امنا</option>
+              <option value="عضو هیئت امنا">عضو هیئت امنا</option>
+              <option value="ناظر">ناظر</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>شماره تماس</label>
+            <input class="input" id="mPhone" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+          </div>
+          <div class="field">
+            <label>ترتیب نمایش</label>
+            <input class="input" type="number" id="mOrder" value="0">
+          </div>
+          <div class="field">
+            <label>تصویر (اختیاری)</label>
+            <div class="img-upload-wrap" style="gap:12px">
+              <div class="img-upload-input">
+                <input type="file" id="mPhoto" accept="image/*" onchange="previewImg(this,'mPhotoPreview')">
+                <div class="img-preview-box" id="mPhotoPreview" style="height:80px">
+                  <span style="font-size:28px">👤</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="mErr" style="display:none;color:#e53e3e;font-size:12.5px;margin-top:6px"></div>
+        <button class="btn btn-navy" style="margin-top:8px" onclick="addMember(this)">افزودن عضو</button>
+      </div>
+
+      <!-- Members list -->
+      <div id="membersList"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+/* ── Projects page ─────────────────────────── */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function escAttr(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'\\n').replace(/\r/g,''); }
+var stLbl = {active:'در حال اجرا', upcoming:'آینده', completed:'تکمیل‌شده'};
+var stCls = {active:'b-ok', upcoming:'b-warn', completed:'b-off'};
+
+function memberRow(m) {
+  var photo = m.photo_path
+    ? '<img src="/uploads/' + m.photo_path + '" style="width:100%;height:100%;object-fit:cover">'
+    : esc(m.full_name[0]);
+  var phone = m.phone ? '<span style="color:var(--muted2);font-size:11px;margin-right:auto">' + esc(m.phone) + '</span>' : '';
+  return '<div style="display:flex;align-items:center;gap:8px;font-size:12.5px">' +
+    '<div style="width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;overflow:hidden;flex-shrink:0">' + photo + '</div>' +
+    '<span style="font-weight:700">' + esc(m.full_name) + '</span>' +
+    '<span style="color:var(--muted);font-size:11px">' + esc(m.role) + '</span>' +
+    phone +
+    '</div>';
+}
+
+function projectCard(p) {
+  var thumb = p.image_path
+    ? '<div style="height:160px;background-image:url(\'/uploads/' + p.image_path + '\');background-size:cover;background-position:center"></div>'
+    : '<div style="height:160px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:40px">🏗</div>';
+
+  var tags = '';
+  if (p.address)   tags += '<span class="pill">📍 ' + esc(p.address) + '</span>';
+  if (p.total_booklets) tags += '<span class="pill">📋 ' + p.total_booklets + ' دفترچه کل</span>';
+  if (p.booklet_count !== undefined) tags += '<span class="pill pill-ok">✓ ' + p.booklet_count + ' ثبت‌شده</span>';
+  if (p.start_date) tags += '<span class="pill">📅 ' + esc(p.start_date) + '</span>';
+
+  var membersHtml = '';
+  if (p.members && p.members.length) {
+    membersHtml = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">' +
+      '<div style="font-size:11px;font-weight:800;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">اعضای هیئت</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px">' +
+      p.members.map(function(m) { return memberRow(m); }).join('') +
+      '</div></div>';
+  }
+
+  var desc = p.description
+    ? '<p style="font-size:12.5px;color:var(--text2);line-height:1.75;margin-bottom:12px">' + esc(p.description) + '</p>'
+    : '';
+
+  var mapHtml = '';
+  if (p.map_lat && p.map_lon) {
+    var lat = parseFloat(p.map_lat), lon = parseFloat(p.map_lon);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      var d = 0.01;
+      var bbox = (lon - d) + ',' + (lat - d) + ',' + (lon + d) + ',' + (lat + d);
+      mapHtml = '<div style="margin-top:12px;border-radius:10px;overflow:hidden;height:180px">' +
+        '<iframe src="https://www.openstreetmap.org/export/embed.html?bbox=' + encodeURIComponent(bbox) +
+        '&layer=mapnik&marker=' + lat + ',' + lon + '" ' +
+        'width="100%" height="180" frameborder="0" style="border:0;display:block" loading="lazy"></iframe>' +
+        '</div>';
+    }
+  }
+
+  return '<div class="card" style="overflow:hidden">' +
+    thumb +
+    '<div style="padding:16px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+    '<h3 style="font-size:15px;font-weight:800">' + esc(p.name) + '</h3>' +
+    '<span class="badge ' + (stCls[p.status] || 'b-off') + '">' + esc(stLbl[p.status] || p.status) + '</span>' +
+    '</div>' +
+    desc +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">' + tags + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="btn btn-ghost btn-sm" onclick="editProj(' + p.id + ')">ویرایش</button>' +
+    '<button class="btn btn-ghost btn-sm" style="color:var(--gold);border-color:var(--gold)" onclick="openMembers(' + p.id + ', \'' + escAttr(p.name) + '\')">👥 اعضای هیئت</button>' +
+    '<button class="btn btn-ghost btn-sm" style="color:#818cf8;border-color:#818cf8" onclick="openGallery(' + p.id + ', \'' + escAttr(p.name) + '\')">🖼 گالری</button>' +
+    '<button class="btn-outline bad" onclick="delProj(' + p.id + ')">حذف</button>' +
+    '</div>' +
+    membersHtml +
+    mapHtml +
+    '</div></div>';
+}
+
+function load() {
+  fetch('/api/projects').then(function(r) { return r.json(); }).then(function(d) {
+    var grid = document.getElementById('projGrid');
+    if (!d.projects.length) {
+      grid.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>پروژه‌ای ثبت نشده</div>';
+      return;
+    }
+    grid.innerHTML = d.projects.map(projectCard).join('');
+  });
+}
+
+var editId = null;
+
+function openProj() {
+  editId = null;
+  document.getElementById('projModalTitle').textContent = 'پروژه جدید';
+  document.getElementById('projEditId').value = '';
+  ['pjName','pjAddr','pjLoc','pjTotalB','pjStart','pjEnd','pjDesc','pjLat','pjLon'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('pjStatus').value = 'active';
+  document.getElementById('pjOrder').value  = '0';
+  document.getElementById('addProj').classList.add('open');
+}
+
+function closeProj() {
+  document.getElementById('addProj').classList.remove('open');
+}
+
+function editProj(id) {
+  fetch('/api/projects').then(function(r) { return r.json(); }).then(function(d) {
+    var p = d.projects.find(function(x) { return x.id === id; });
+    if (!p) return;
+    editId = id;
+    document.getElementById('projModalTitle').textContent = 'ویرایش: ' + p.name;
+    document.getElementById('projEditId').value = id;
+    document.getElementById('pjName').value     = p.name || '';
+    document.getElementById('pjAddr').value     = p.address || '';
+    document.getElementById('pjLoc').value      = p.location || '';
+    document.getElementById('pjTotalB').value   = p.total_booklets || 0;
+    document.getElementById('pjStart').value    = p.start_date || '';
+    document.getElementById('pjEnd').value      = p.end_date || '';
+    document.getElementById('pjStatus').value   = p.status || 'active';
+    document.getElementById('pjOrder').value    = p.order || 0;
+    document.getElementById('pjDesc').value     = p.description || '';
+    document.getElementById('pjLat').value      = p.map_lat || '';
+    document.getElementById('pjLon').value      = p.map_lon || '';
+    document.getElementById('addProj').classList.add('open');
+  });
+}
+
+function saveProj() {
+  var fd = new FormData();
+  fd.append('name',           document.getElementById('pjName').value);
+  fd.append('address',        document.getElementById('pjAddr').value);
+  fd.append('location',       document.getElementById('pjLoc').value);
+  fd.append('total_booklets', document.getElementById('pjTotalB').value);
+  fd.append('start_date',     document.getElementById('pjStart').value);
+  fd.append('end_date',       document.getElementById('pjEnd').value);
+  fd.append('status',         document.getElementById('pjStatus').value);
+  fd.append('order',          document.getElementById('pjOrder').value);
+  fd.append('description',    document.getElementById('pjDesc').value);
+  var img = document.getElementById('pjImg').files[0];
+  if (img) fd.append('image', img);
+  fd.append('map_lat', document.getElementById('pjLat').value.trim());
+  fd.append('map_lon', document.getElementById('pjLon').value.trim());
+
+  var eid = document.getElementById('projEditId').value;
+  var url = eid ? '/api/projects/' + eid : '/api/projects';
+  var btn = event.target;
+  btnLoading(btn, true);
+  fetch(url, {method: 'POST', body: fd}).then(function(r) {
+    btnLoading(btn, false);
+    if (r.ok) { closeProj(); toast(eid ? 'پروژه ویرایش شد' : 'پروژه ثبت شد'); load(); }
+  });
+}
+
+function delProj(id) {
+  confirmAction('این پروژه حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    fetch('/api/projects/' + id + '/delete', {method: 'POST'}).then(function() { load(); });
+  });
+}
+
+/* ── Members ─────────────────────────────────── */
+var currentProjId = null;
+
+function openMembers(pid, name) {
+  currentProjId = pid;
+  document.getElementById('membersProjId').value = pid;
+  document.getElementById('membersModalTitle').textContent = 'اعضای هیئت — ' + name;
+  document.getElementById('mName').value = '';
+  document.getElementById('mPhone').value = '';
+  document.getElementById('mOrder').value = '0';
+  document.getElementById('mErr').style.display = 'none';
+  document.getElementById('membersModal').classList.add('open');
+  loadMembers(pid);
+}
+
+function loadMembers(pid) {
+  fetch('/api/projects/' + pid + '/members').then(function(r) { return r.json(); }).then(function(d) {
+    var el = document.getElementById('membersList');
+    var roleColors = {
+      'مدیر اجرایی': '#B8945A',
+      'رئیس هیئت اجرایی': '#1A2640',
+      'مدیر هیئت امنا': '#1E6B4A',
+      'عضو هیئت امنا': '#1E6B4A',
+      'ناظر': '#6A5F4E'
+    };
+    if (!d.members.length) {
+      el.innerHTML = '<div class="empty" style="padding:20px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>هنوز عضوی اضافه نشده</div>';
+      return;
+    }
+    el.innerHTML = d.members.map(function(m) {
+      var bg = roleColors[m.role] || 'var(--navy)';
+      var avatar = m.photo_path
+        ? '<img src="/uploads/' + m.photo_path + '" style="width:100%;height:100%;object-fit:cover">'
+        : esc(m.full_name[0]);
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">' +
+        '<div style="width:44px;height:44px;border-radius:50%;background:' + bg + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;overflow:hidden;border:2px solid var(--border)">' + avatar + '</div>' +
+        '<div style="flex:1">' +
+        '<div style="font-weight:800;font-size:13.5px">' + m.full_name + '</div>' +
+        '<div style="font-size:11.5px;color:var(--muted);margin-top:2px">' +
+        '<span style="background:' + bg + '22;color:' + bg + ';padding:2px 8px;border-radius:999px;font-weight:700">' + m.role + '</span>' +
+        (m.phone ? ' &nbsp;·&nbsp; ' + m.phone : '') +
+        '</div></div>' +
+        '<button class="btn-outline bad" onclick="deleteMember(' + currentProjId + ',' + m.id + ',this)">حذف</button>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+function addMember(btn) {
+  var err = document.getElementById('mErr');
+  err.style.display = 'none';
+  var pid = document.getElementById('membersProjId').value;
+  var name = document.getElementById('mName').value.trim();
+  if (!name) { err.textContent = 'نام الزامی است.'; err.style.display = ''; return; }
+  var fd = new FormData();
+  fd.append('role',      document.getElementById('mRole').value);
+  fd.append('full_name', name);
+  fd.append('phone',     document.getElementById('mPhone').value.trim());
+  fd.append('order',     document.getElementById('mOrder').value || '0');
+  var photo = document.getElementById('mPhoto').files[0];
+  if (photo) fd.append('photo', photo);
+  btnLoading(btn, true);
+  fetch('/api/projects/' + pid + '/members', {method: 'POST', body: fd}).then(function(r) {
+    btnLoading(btn, false);
+    return r.json();
+  }).then(function(d) {
+    if (d.error) { err.textContent = d.error; err.style.display = ''; return; }
+    document.getElementById('mName').value = '';
+    document.getElementById('mPhone').value = '';
+    document.getElementById('mPhoto').value = '';
+    var pv = document.getElementById('mPhotoPreview');
+    pv.style.backgroundImage = '';
+    pv.innerHTML = '<span style="font-size:28px">👤</span>';
+    toast('عضو اضافه شد');
+    loadMembers(pid);
+    load();
+  });
+}
+
+function deleteMember(pid, mid, btn) {
+  confirmAction('این عضو حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    btnLoading(btn, true);
+    fetch('/api/projects/' + pid + '/members/' + mid, {method: 'DELETE'}).then(function() {
+      loadMembers(pid);
+      load();
+    });
+  });
+}
+
+function previewImg(input, previewId) {
+  var file = input.files[0];
+  var box = document.getElementById(previewId);
+  if (!file || !box) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    box.style.backgroundImage = 'url(' + e.target.result + ')';
+    box.style.backgroundSize = 'cover';
+    box.style.backgroundPosition = 'center';
+    box.innerHTML = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Gallery ─────────────────────────────────── */
+var currentGalleryProjId = null;
+var isAdmin = {{ 'true' if current_user.role == 'admin' else 'false' }};
+
+function openGallery(pid, name) {
+  currentGalleryProjId = pid;
+  document.getElementById('galleryProjId').value = pid;
+  document.getElementById('galleryModalTitle').textContent = 'گالری — ' + name;
+  document.getElementById('gFile').value = '';
+  document.getElementById('gCaption').value = '';
+  document.getElementById('gErr').style.display = 'none';
+  document.getElementById('galleryUploadArea').style.display = isAdmin ? '' : 'none';
+  document.getElementById('galleryModal').classList.add('open');
+  loadGallery(pid);
+}
+
+function loadGallery(pid) {
+  var grid = document.getElementById('galleryGrid');
+  grid.innerHTML = '<div style="text-align:center;padding:30px;opacity:.5">در حال بارگذاری…</div>';
+  fetch('/api/projects/' + pid + '/gallery').then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.gallery.length) {
+      grid.innerHTML = '<div class="empty" style="padding:20px;grid-column:1/-1"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>هنوز فایلی اضافه نشده</div>';
+      return;
+    }
+    grid.innerHTML = d.gallery.map(function(g) {
+      var thumb = g.file_type === 'video'
+        ? '<div style="height:120px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer" onclick="openLightbox(\'' + g.file_type + '\',\'/uploads/' + g.file_path + '\',\'' + (g.caption||'').replace(/'/g,"\\'") + '\')">▶</div>'
+        : '<div style="height:120px;background-image:url(\'/uploads/' + g.file_path + '\');background-size:cover;background-position:center;cursor:pointer" onclick="openLightbox(\'' + g.file_type + '\',\'/uploads/' + g.file_path + '\',\'' + (g.caption||'').replace(/'/g,"\\'") + '\')"></div>';
+      var del = isAdmin
+        ? '<button onclick="deleteGallery(' + g.id + ',this)" style="position:absolute;top:4px;left:4px;background:rgba(239,68,68,.85);border:none;color:#fff;border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer">×</button>'
+        : '';
+      var cap = g.caption ? '<div style="font-size:11px;padding:4px 6px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + g.caption + '</div>' : '';
+      return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative">' + thumb + del + cap + '</div>';
+    }).join('');
+  });
+}
+
+function uploadGallery(btn) {
+  var err = document.getElementById('gErr');
+  err.style.display = 'none';
+  var file = document.getElementById('gFile').files[0];
+  if (!file) { err.textContent = 'لطفاً یک فایل انتخاب کنید.'; err.style.display = ''; return; }
+  var fd = new FormData();
+  fd.append('file', file);
+  fd.append('caption', document.getElementById('gCaption').value.trim());
+  btnLoading(btn, true);
+  fetch('/api/projects/' + currentGalleryProjId + '/gallery', {method: 'POST', body: fd})
+    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, d: d}; }); })
+    .then(function(x) {
+      btnLoading(btn, false);
+      if (!x.ok) { err.textContent = x.d.error || 'خطا در آپلود'; err.style.display = ''; return; }
+      document.getElementById('gFile').value = '';
+      document.getElementById('gCaption').value = '';
+      toast('فایل آپلود شد');
+      loadGallery(currentGalleryProjId);
+    })
+    .catch(function() { btnLoading(btn, false); err.textContent = 'خطا در ارتباط با سرور'; err.style.display = ''; });
+}
+
+function deleteGallery(gid, btn) {
+  confirmAction('این فایل از گالری حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    btnLoading(btn, true);
+    fetch('/api/projects/' + currentGalleryProjId + '/gallery/' + gid, {method: 'DELETE'})
+      .then(function() { loadGallery(currentGalleryProjId); });
+  });
+}
+
+function openLightbox(type, url, caption) {
+  var lb = document.getElementById('lightbox');
+  var img = document.getElementById('lbImg');
+  var vid = document.getElementById('lbVid');
+  var cap = document.getElementById('lbCaption');
+  img.style.display = 'none'; vid.style.display = 'none';
+  if (type === 'video') {
+    vid.src = url; vid.style.display = '';
+  } else {
+    img.src = url; img.style.display = '';
+  }
+  cap.textContent = caption || '';
+  lb.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox(e) {
+  if (e && e.target !== document.getElementById('lightbox') && !(e.currentTarget.tagName === 'BUTTON')) return;
+  var lb = document.getElementById('lightbox');
+  lb.style.display = 'none';
+  document.getElementById('lbVid').pause && document.getElementById('lbVid').pause();
+  document.getElementById('lbVid').src = '';
+  document.getElementById('lbImg').src = '';
+  document.body.style.overflow = '';
+}
+
+load();
+</script>
+{% endblock %}

@@ -1,0 +1,195 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">مالی و اقساط</h1>
+  <button class="btn btn-gold" id="openPlanModalBtn">
++ طرح پرداخت</button>
+</div>
+<div class="pills" id="summary"></div>
+<div class="tabs">
+  <button class="tab active" data-pane="payments">اقساط</button>
+  <button class="tab" data-pane="plans">طرح‌ها</button>
+</div>
+
+<div id="pane-payments" class="tab-pane active">
+  <div class="filter-row" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <select class="input" id="filterProject" style="max-width:220px;flex:1" onchange="loadPayments()">
+      <option value="">همه پروژه‌ها</option>
+    </select>
+    <select class="input" id="filterStatus" style="max-width:160px;flex:1" onchange="loadPayments()">
+      <option value="">همه وضعیت‌ها</option>
+      <option value="unpaid">در انتظار</option>
+      <option value="paid">پرداخت‌شده</option>
+      <option value="overdue">معوق</option>
+    </select>
+  </div>
+  <div class="card">
+    <div class="tbl-scroll-hint">برای مشاهده همه ستون‌ها، جدول را بکشید</div>
+    <div class="tbl-wrap">
+      <table class="tbl"><thead><tr>
+        <th>عضو</th><th>پروژه</th><th>دفترچه</th><th>سهم</th><th>طرح</th>
+        <th>مبلغ (ریال)</th><th>سررسید</th><th>پرداخت</th><th>وضعیت</th><th>عملیات</th>
+      </tr></thead><tbody id="ptBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="pane-plans" class="tab-pane">
+  <div class="filter-row" style="margin-bottom:12px;display:flex;gap:10px">
+    <select class="input" id="filterPlanProject" style="max-width:220px;flex:1" onchange="loadPlans()">
+      <option value="">همه پروژه‌ها</option>
+    </select>
+  </div>
+  <div id="plansList"></div>
+</div>
+
+<!-- Modal طرح -->
+<div class="modal" id="planModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title">طرح پرداخت جدید</span><button class="modal-x" onclick="modal.close('planModal')">×</button></div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="field span-2"><label>پروژه مرتبط *</label>
+          <select class="input" id="plProj"><option value="">— انتخاب کنید —</option></select>
+        </div>
+        <div class="field span-2"><label>عنوان طرح *</label><input class="input" id="plT" placeholder="مثلاً: اقساط سال ۱۴۰۴"></div>
+        <div class="field"><label>مبلغ کل — تمام‌سهم (ریال) *</label><input class="input" type="text" id="plAmt" data-amount inputmode="numeric"></div>
+        <div class="field"><label>تعداد اقساط *</label><input class="input" type="number" id="plN" value="12"></div>
+        <div class="field"><label>تاریخ شروع *</label><input class="input" id="plStart" placeholder="۱۴۰۴/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>توضیحات</label><input class="input" id="plDesc"></div>
+      </div>
+      <div class="alert alert-info" style="margin-top:8px;font-size:12.5px">
+        نیم‌سهم‌ها نصف مبلغ را پرداخت می‌کنند. طرح به‌صورت خودکار برای همه دارندگان دفترچه این پروژه ساخته می‌شود.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="createPlan()">ایجاد طرح</button>
+      <button class="btn btn-ghost" onclick="modal.close('planModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+
+{% endblock %}
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var allPayments = [];
+var projectsMap = {};
+
+function fmtR(n){ return Number(n||0).toLocaleString(); }
+
+function statusLabel(s){ return s==='paid'?'پرداخت‌شده':s==='overdue'?'معوق':'در انتظار'; }
+function statusClass(s){ return s==='paid'?'b-ok':s==='overdue'?'b-bad':'b-warn'; }
+
+function loadProjectFilters(){
+  fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+    d.projects.forEach(function(p){ projectsMap[p.id]=p.name; });
+    ['filterProject','filterPlanProject','plProj'].forEach(function(id){
+      var el=document.getElementById(id); if(!el)return;
+      var opt=id==='plProj'?'<option value="">— انتخاب پروژه —</option>':'<option value="">همه پروژه‌ها</option>';
+      el.innerHTML=opt+d.projects.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');
+    });
+  });
+}
+
+function loadPayments(){
+  Promise.all([
+    fetch('/api/finance/payments').then(function(r){return r.json();}),
+    fetch('/api/finance/summary').then(function(r){return r.json();})
+  ]).then(function(res){
+    var payments=res[0].payments, s=res[1].summary;
+    allPayments=payments;
+    document.getElementById('summary').innerHTML=
+      '<div class="pill">کل: '+fmtR(s.total.amount)+' ریال</div>'+
+      '<div class="pill pill-ok">پرداخت: '+fmtR(s.paid.amount)+'</div>'+
+      '<div class="pill pill-warn">در انتظار: '+fmtR(s.unpaid.amount)+'</div>'+
+      '<div class="pill pill-bad">معوق: '+fmtR(s.overdue.amount)+'</div>';
+    var proj=document.getElementById('filterProject').value;
+    var stat=document.getElementById('filterStatus').value;
+    var filtered=payments.filter(function(p){
+      if(proj && p.booklet && projectsMap[proj] && p.booklet.project_name!==projectsMap[proj]) return false;
+      if(stat && p.status!==stat) return false;
+      return true;
+    });
+    document.getElementById('ptBody').innerHTML=filtered.map(function(p){
+      var shareLabel=p.booklet?(p.booklet.share_type==='full'?'تمام':'نیم'):'—';
+      var shareClass=p.booklet&&p.booklet.share_type==='full'?'b-ok':'b-warn';
+      var btns='';
+      if(p.status!=='paid') btns+='<button class="btn-outline ok" onclick="setStatus('+p.id+',\'paid\')">تأیید</button> ';
+      if(p.status==='unpaid') btns+='<button class="btn-outline bad" onclick="setStatus('+p.id+',\'overdue\')">معوق</button>';
+      var receipt='';
+      if(p.receipt_path){
+        var rLabel=(p.user?p.user.full_name:'')+' — '+p.due_date;
+        if(/\.(jpg|jpeg|png|gif|webp)$/i.test(p.receipt_path)){
+          receipt='<a href="#" class="badge b-warn" style="margin-right:4px;cursor:pointer" title="مشاهده فیش" onclick="imgViewer.open({src:\'/uploads/'+p.receipt_path+'\',label:'+esc(JSON.stringify(rLabel))+'});return false;">📎 فیش</a>';
+        } else {
+          receipt='<a href="/uploads/'+p.receipt_path+'" target="_blank" class="badge b-warn" style="margin-right:4px">📎 فیش</a>';
+        }
+      }
+      return '<tr>'+
+        '<td>'+esc(p.user?p.user.full_name:'—')+'</td>'+
+        '<td>'+esc(p.booklet?p.booklet.project_name:'—')+'</td>'+
+        '<td class="mono">'+esc(p.booklet?p.booklet.code:'—')+'</td>'+
+        '<td><span class="badge '+shareClass+'">'+shareLabel+'</span></td>'+
+        '<td>'+esc(p.plan?p.plan.title:'—')+'</td>'+
+        '<td class="mono">'+fmtR(p.amount)+'</td>'+
+        '<td>'+esc(p.due_date)+'</td>'+
+        '<td>'+esc(p.paid_date||'—')+'</td>'+
+        '<td><span class="badge '+statusClass(p.status)+'">'+statusLabel(p.status)+'</span>'+receipt+'</td>'+
+        '<td style="display:flex;gap:4px">'+btns+'</td>'+
+        '</tr>';
+    }).join('');
+  });
+}
+
+function loadPlans(){
+  var pid=document.getElementById('filterPlanProject')?document.getElementById('filterPlanProject').value:'';
+  var url='/api/finance/plans'+(pid?'?project_id='+pid:'');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    document.getElementById('plansList').innerHTML=d.plans.length?d.plans.map(function(p){
+      return '<div class="list-row"><div class="list-body"><b>'+esc(p.title)+'</b><br><small style="color:var(--muted)">'+esc(p.project_name||'همه')+'  —  '+p.installments+' قسط — شروع: '+esc(p.start_date)+'</small></div><div class="mono" style="font-weight:700">'+fmtR(p.total_amount)+' ریال</div></div>';
+    }).join(''):'<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>طرحی ثبت نشده</div>';
+  });
+}
+
+function setStatus(id,status){
+  var today=new Date(); var jy=today.getFullYear()-621;
+  var paid_date=status==='paid'?jy+'/'+String(today.getMonth()+1).padStart(2,'0')+'/'+String(today.getDate()).padStart(2,'0'):undefined;
+  fetch('/api/finance/payments/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status,paid_date:paid_date})}).then(function(){loadPayments();});
+}
+
+function createPlan(){
+  var plProj=document.getElementById('plProj').value;
+  var body={
+    project_id:plProj||null,
+    title:document.getElementById('plT').value.trim(),
+    total_amount:getRawAmt(document.getElementById('plAmt')),
+    installments:parseInt(document.getElementById('plN').value)||12,
+    start_date:document.getElementById('plStart').value.trim(),
+    description:document.getElementById('plDesc').value.trim()
+  };
+  fetch('/api/finance/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){document.getElementById('planModal').classList.remove('open');toast('طرح ساخته شد — '+d.payments_created+' قسط');loadPayments();loadPlans();}
+  });
+}
+
+function initTabs2(){
+  document.querySelectorAll('.tabs').forEach(function(tabs){
+    tabs.querySelectorAll('.tab').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var pane=btn.dataset.pane;
+        tabs.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b===btn);});
+        document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.toggle('active',p.id==='pane-'+pane);});
+      });
+    });
+  });
+}
+
+document.getElementById('openPlanModalBtn').addEventListener('click',function(){
+  modal.open('planModal');
+});
+loadProjectFilters(); loadPayments(); loadPlans(); initTabs2();
+</script>
+{% endblock %}

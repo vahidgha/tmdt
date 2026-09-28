@@ -1,0 +1,374 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+  <div>
+    <h1 class="pg-title">تیکت‌ها</h1>
+    <p class="pg-sub">{% if user.role == 'admin' %}مدیریت تمام درخواست‌های پشتیبانی{% else %}ارسال و پیگیری درخواست‌ها{% endif %}</p>
+  </div>
+  <button class="btn btn-navy" onclick="modal.open('newTicketModal')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0"><path d="M12 5v14M5 12h14"/></svg>
+    تیکت جدید
+  </button>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px;padding:16px 20px">
+  <div style="display:grid;grid-template-columns:1fr minmax(140px,180px) minmax(140px,180px) auto;gap:12px;align-items:end">
+    <div class="field" style="margin:0">
+      <label>جستجو</label>
+      <input type="text" id="tkSearch" class="input" placeholder="موضوع / شماره تیکت …" oninput="debouncedLoad()">
+    </div>
+    <div class="field" style="margin:0">
+      <label>وضعیت</label>
+      <select id="tkStatus" class="input" onchange="load()">
+        <option value="">همه</option>
+        <option value="open">باز</option>
+        <option value="in_progress">در حال بررسی</option>
+        <option value="waiting">منتظر پاسخ</option>
+        <option value="resolved">حل‌شده</option>
+        <option value="closed">بسته</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0">
+      <label>اولویت</label>
+      <select id="tkPrio" class="input" onchange="load()">
+        <option value="">همه</option>
+        <option value="urgent">فوری</option>
+        <option value="high">بالا</option>
+        <option value="normal">معمولی</option>
+        <option value="low">پایین</option>
+      </select>
+    </div>
+    <button class="btn btn-ghost" onclick="resetFilters()" style="white-space:nowrap">پاک کردن</button>
+  </div>
+</div>
+
+<!-- Ticket list -->
+<div id="ticketList">
+  <div style="text-align:center;padding:60px;opacity:.5">در حال بارگذاری…</div>
+</div>
+
+<!-- Pagination -->
+<div id="tkPager" style="display:flex;justify-content:center;gap:8px;margin-top:16px;flex-wrap:wrap"></div>
+
+<!-- ── New Ticket Modal ──────────────────────────────── -->
+<div class="modal" id="newTicketModal">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-head">
+      <span class="modal-title">ارسال تیکت جدید</span>
+      <button class="modal-x" onclick="modal.close('newTicketModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="newTkErr" class="alert alert-bad" style="display:none"></p>
+
+      <div class="field">
+        <label>موضوع <span style="color:var(--bad)">*</span></label>
+        <input type="text" id="tkSubject" class="input" placeholder="موضوع تیکت …" maxlength="160">
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px" class="field">
+          <label>دسته‌بندی</label>
+          <select id="tkCat" class="input">
+            <option value="general">عمومی</option>
+            <option value="financial">مالی</option>
+            <option value="transfer">نقل و انتقال</option>
+            <option value="technical">فنی</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:140px" class="field">
+          <label>اولویت</label>
+          <select id="tkPrioNew" class="input">
+            <option value="normal">معمولی</option>
+            <option value="low">پایین</option>
+            <option value="high">بالا</option>
+            <option value="urgent">فوری</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>متن پیام <span style="color:var(--bad)">*</span></label>
+        <textarea id="tkBody" class="input" rows="5" placeholder="توضیح کامل مشکل یا درخواست خود را بنویسید …"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="modal.close('newTicketModal')">انصراف</button>
+      <button class="btn btn-navy" id="submitTkBtn" onclick="submitTicket(this)">ارسال تیکت</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Ticket Detail Modal ──────────────────────────── -->
+<div class="modal" id="ticketDetailModal">
+  <div class="modal-box" style="max-width:640px;display:flex;flex-direction:column;height:min(90vh,700px)">
+    <div class="modal-head">
+      <span class="modal-title" id="tdTitle">تیکت</span>
+      <button class="modal-x" onclick="modal.close('ticketDetailModal')">✕</button>
+    </div>
+
+    <div style="padding:10px 20px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center" id="tdMeta"></div>
+
+    <!-- Thread -->
+    <div id="tdThread" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;min-height:0">
+      <div style="text-align:center;opacity:.4">در حال بارگذاری…</div>
+    </div>
+
+    <!-- Reply area -->
+    <div style="padding:14px 20px;border-top:1px solid var(--border)">
+      <p id="tdErr" class="alert alert-bad" style="display:none"></p>
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <textarea id="tdReply" class="input" rows="2" placeholder="پاسخ خود را بنویسید …" style="flex:1;resize:none"></textarea>
+        <button class="btn btn-navy" id="tdReplyBtn" onclick="sendReply(this)" style="flex-shrink:0;align-self:flex-end">ارسال</button>
+      </div>
+      {% if user.role == 'admin' %}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px" id="tdAdminActions"></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+.tk-card{background:var(--card-bg,var(--card));border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;transition:border-color .18s,box-shadow .18s;margin-bottom:10px}
+.tk-card:hover{border-color:var(--accent);box-shadow:0 2px 14px rgba(0,0,0,.08)}
+.tk-num{font-size:11px;opacity:.5;font-family:monospace}
+.tk-subject{font-weight:700;font-size:15px;margin:4px 0}
+.tk-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.prio{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.prio-urgent{background:rgba(239,68,68,.12);color:#ef4444}
+.prio-high{background:rgba(245,158,11,.12);color:#f59e0b}
+.prio-normal{background:rgba(59,130,246,.1);color:#3b82f6}
+.prio-low{background:rgba(107,114,128,.1);color:#9ca3af}
+.st{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.st-open{background:rgba(16,185,129,.12);color:#10b981}
+.st-in_progress{background:rgba(59,130,246,.12);color:#3b82f6}
+.st-waiting{background:rgba(245,158,11,.12);color:#f59e0b}
+.st-resolved{background:rgba(107,114,128,.1);color:#9ca3af}
+.st-closed{background:rgba(107,114,128,.08);color:#6b7280}
+.tk-cat{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;background:var(--bg-alt,var(--card));border:1px solid var(--border)}
+.msg-bubble{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;max-width:88%;white-space:pre-wrap;word-break:break-word}
+.msg-user{background:var(--input-bg,var(--bg-alt));border:1px solid var(--border);align-self:flex-end;border-bottom-right-radius:3px}
+.msg-admin{background:rgba(200,164,86,.1);border:1px solid rgba(200,164,86,.2);align-self:flex-start;border-bottom-left-radius:3px}
+.msg-wrap{display:flex;flex-direction:column}
+.msg-meta{font-size:10px;opacity:.45;margin-bottom:3px}
+</style>
+
+<script>
+var currentPage=1, currentTkId=null;
+var debTimer=null;
+function debouncedLoad(){clearTimeout(debTimer);debTimer=setTimeout(load,400);}
+
+var prioLabel={urgent:'فوری',high:'بالا',normal:'معمولی',low:'پایین'};
+var statusLabel={open:'باز',in_progress:'در حال بررسی',waiting:'منتظر پاسخ',resolved:'حل‌شده',closed:'بسته'};
+var catLabel={general:'عمومی',financial:'مالی',transfer:'نقل و انتقال',technical:'فنی',marketplace:'بازار خرید و فروش'};
+
+function resetFilters(){
+  document.getElementById('tkSearch').value='';
+  document.getElementById('tkStatus').value='';
+  document.getElementById('tkPrio').value='';
+  load();
+}
+
+function load(page){
+  if(page) currentPage=page;
+  var params=new URLSearchParams();
+  params.set('page',currentPage);
+  params.set('per_page',15);
+  var s=document.getElementById('tkSearch').value.trim();
+  var st=document.getElementById('tkStatus').value;
+  var pr=document.getElementById('tkPrio').value;
+  if(s) params.set('search',s);
+  if(st) params.set('status',st);
+  if(pr) params.set('priority',pr);
+
+  fetch('/api/tickets?'+params.toString())
+    .then(function(r){return r.json();})
+    .then(function(data){
+      renderList(data.tickets||[]);
+      renderPager(data.page,data.pages);
+    })
+    .catch(function(){
+      document.getElementById('ticketList').innerHTML='<div style="text-align:center;padding:40px;color:var(--bad)">خطا در بارگذاری</div>';
+    });
+}
+
+function renderList(items){
+  var el=document.getElementById('ticketList');
+  if(!items.length){
+    el.innerHTML='<div class="card" style="text-align:center;padding:50px;opacity:.5"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="margin:0 auto 12px;display:block;opacity:.4"><path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>هیچ تیکتی یافت نشد</div>';
+    return;
+  }
+  el.innerHTML=items.map(function(t){
+    var dt=new Date(t.updated_at||t.created_at);
+    var dtStr=dt.toLocaleDateString('fa-IR');
+    return '<div class="tk-card" onclick="openTicket('+t.id+')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="tk-num">#'+t.number+'</div>'+
+          '<div class="tk-subject">'+esc(t.subject)+'</div>'+
+        '</div>'+
+        '<span class="st st-'+t.status+'">'+statusLabel[t.status]+'</span>'+
+      '</div>'+
+      '<div class="tk-row">'+
+        '<span class="prio prio-'+t.priority+'">'+prioLabel[t.priority]+'</span>'+
+        '<span class="tk-cat">'+catLabel[t.category]+'</span>'+
+        (t.creator_name?'<span style="font-size:11px;opacity:.5">'+esc(t.creator_name)+'</span>':'')+
+        '<span style="font-size:11px;opacity:.4;margin-right:auto">'+dtStr+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderPager(page,pages){
+  var el=document.getElementById('tkPager');
+  if(!pages||pages<=1){el.innerHTML='';return;}
+  var html='';
+  if(page>1) html+='<button class="btn btn-ghost" style="padding:6px 14px" onclick="load('+(page-1)+')">قبلی</button>';
+  for(var p=Math.max(1,page-2);p<=Math.min(pages,page+2);p++){
+    html+='<button class="btn '+(p===page?'btn-navy':'btn-ghost')+'" style="padding:6px 12px;min-width:36px" onclick="load('+p+')">'+p+'</button>';
+  }
+  if(page<pages) html+='<button class="btn btn-ghost" style="padding:6px 14px" onclick="load('+(page+1)+')">بعدی</button>';
+  el.innerHTML=html;
+}
+
+function openTicket(id){
+  currentTkId=id;
+  document.getElementById('tdTitle').textContent='در حال بارگذاری…';
+  document.getElementById('tdMeta').innerHTML='';
+  document.getElementById('tdThread').innerHTML='<div style="text-align:center;opacity:.4;padding:20px">در حال بارگذاری…</div>';
+  document.getElementById('tdReply').value='';
+  document.getElementById('tdErr').style.display='none';
+  modal.open('ticketDetailModal');
+  loadTicket(id);
+}
+
+function loadTicket(id){
+  fetch('/api/tickets/'+id)
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var t=data.ticket||data;
+      document.getElementById('tdTitle').textContent='#'+t.number+' — '+t.subject;
+      document.getElementById('tdMeta').innerHTML=
+        '<span class="st st-'+t.status+'">'+statusLabel[t.status]+'</span>'+
+        '<span class="prio prio-'+t.priority+'">'+prioLabel[t.priority]+'</span>'+
+        '<span class="tk-cat">'+catLabel[t.category]+'</span>'+
+        (t.creator_name?'<span style="font-size:12px;opacity:.5">'+esc(t.creator_name)+'</span>':'')+
+        (t.assigned_name?'<span style="font-size:12px;opacity:.5">مسئول: '+esc(t.assigned_name)+'</span>':'');
+
+      var thread=document.getElementById('tdThread');
+      var msgs=t.messages||[];
+      if(!msgs.length){
+        thread.innerHTML='<div style="text-align:center;opacity:.4;padding:20px">پیامی وجود ندارد</div>';
+      } else {
+        thread.innerHTML=msgs.map(function(m){
+          var dt=new Date(m.created_at);
+          var dtStr=dt.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'})+' — '+dt.toLocaleDateString('fa-IR');
+          var isAdmin=m.is_admin;
+          return '<div class="msg-wrap" style="align-items:'+(isAdmin?'flex-start':'flex-end')+'">'+
+            '<div class="msg-meta">'+(isAdmin?'مدیر':esc(t.creator_name||'شما'))+' — '+dtStr+'</div>'+
+            '<div class="msg-bubble '+(isAdmin?'msg-admin':'msg-user')+'">'+esc(m.body)+'</div>'+
+          '</div>';
+        }).join('');
+        thread.scrollTop=thread.scrollHeight;
+      }
+
+      {% if user.role == 'admin' %}
+      renderAdminActions(t.status);
+      {% endif %}
+    })
+    .catch(function(){
+      document.getElementById('tdThread').innerHTML='<div style="text-align:center;color:var(--bad);padding:20px">خطا در بارگذاری</div>';
+    });
+}
+
+{% if user.role == 'admin' %}
+function renderAdminActions(status){
+  var el=document.getElementById('tdAdminActions');
+  var actions=[];
+  if(status==='open'||status==='waiting')
+    actions.push('<button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="changeStatus(\'in_progress\')">شروع بررسی</button>');
+  if(status!=='waiting')
+    actions.push('<button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="changeStatus(\'waiting\')">منتظر پاسخ کاربر</button>');
+  if(status!=='resolved')
+    actions.push('<button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;color:var(--good,#10b981)" onclick="changeStatus(\'resolved\')">حل‌شده</button>');
+  if(status!=='closed')
+    actions.push('<button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;color:var(--bad,#ef4444)" onclick="changeStatus(\'closed\')">بستن تیکت</button>');
+  el.innerHTML=actions.join('');
+}
+
+function changeStatus(st){
+  fetch('/api/tickets/'+currentTkId+'/status',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:st})
+  })
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+  .then(function(x){
+    if(!x.ok){toast(x.d.error||'خطا','warn');return;}
+    toast('وضعیت تیکت تغییر کرد');
+    loadTicket(currentTkId);
+    load();
+  })
+  .catch(function(){toast('خطا در ارتباط با سرور','warn');});
+}
+{% endif %}
+
+function sendReply(btn){
+  var body=document.getElementById('tdReply').value.trim();
+  var errEl=document.getElementById('tdErr');
+  errEl.style.display='none';
+  if(!body){errEl.textContent='متن پاسخ نمی‌تواند خالی باشد.';errEl.style.display='block';return;}
+  btnLoading(btn,true);
+  fetch('/api/tickets/'+currentTkId+'/reply',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({body:body})
+  })
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+  .then(function(x){
+    btnLoading(btn,false);
+    if(!x.ok){errEl.textContent=x.d.error||'خطا';errEl.style.display='block';return;}
+    document.getElementById('tdReply').value='';
+    loadTicket(currentTkId);
+    load();
+  })
+  .catch(function(){btnLoading(btn,false);errEl.textContent='خطا در ارتباط با سرور';errEl.style.display='block';});
+}
+
+function submitTicket(btn){
+  var subject=document.getElementById('tkSubject').value.trim();
+  var body=document.getElementById('tkBody').value.trim();
+  var cat=document.getElementById('tkCat').value;
+  var prio=document.getElementById('tkPrioNew').value;
+  var errEl=document.getElementById('newTkErr');
+  errEl.style.display='none';
+  if(!subject){errEl.textContent='موضوع الزامی است.';errEl.style.display='block';return;}
+  if(!body){errEl.textContent='متن پیام الزامی است.';errEl.style.display='block';return;}
+  btnLoading(btn,true);
+  fetch('/api/tickets',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({subject:subject,body:body,category:cat,priority:prio})
+  })
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+  .then(function(x){
+    btnLoading(btn,false);
+    if(!x.ok){errEl.textContent=x.d.error||'خطا';errEl.style.display='block';return;}
+    modal.close('newTicketModal');
+    document.getElementById('tkSubject').value='';
+    document.getElementById('tkBody').value='';
+    toast('تیکت با موفقیت ارسال شد');
+    load();
+    openTicket((x.d.ticket&&x.d.ticket.id)||x.d.id);
+  })
+  .catch(function(){btnLoading(btn,false);errEl.textContent='خطا در ارتباط با سرور';errEl.style.display='block';});
+}
+
+function esc(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+load();
+</script>
+{% endblock %}

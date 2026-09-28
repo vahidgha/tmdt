@@ -1,0 +1,89 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<h1 class="pg-title" style="margin-bottom:18px">اقساط و پرداخت‌های من</h1>
+<div id="stmtCard" class="card card-p" style="margin-bottom:16px;display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <span style="font-weight:800">کارت حساب من</span>
+    <a class="btn-outline btn-sm no-print" href="/dashboard/accounting/statement/{{ user.id }}">مشاهده کامل و چاپ</a>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+    <div><div style="font-size:12px;color:var(--muted)">کل بدهی</div><b id="stDebt" style="font-size:16px"></b></div>
+    <div><div style="font-size:12px;color:var(--muted)">پرداخت‌شده</div><b id="stPaid" style="font-size:16px;color:var(--ok)"></b></div>
+    <div><div style="font-size:12px;color:var(--muted)">مانده بدهی</div><b id="stRem" style="font-size:16px;color:var(--bad)"></b></div>
+    <div><div style="font-size:12px;color:var(--muted)">کل واریزی</div><b id="stDep" style="font-size:16px"></b></div>
+  </div>
+</div>
+<div class="pills stagger" id="sum"></div>
+<div id="list" class="pay-list stagger">در حال بارگذاری…</div>
+
+
+
+{% endblock %}
+{% block scripts %}
+<script>
+function fmtR(n){ return Number(n||0).toLocaleString(); }
+function loadStatement(){
+  fetch('/api/accounting/member/{{ user.id }}/statement').then(function(r){return r.ok?r.json():null;}).then(function(d){
+    if(!d)return;var t=d.totals;
+    document.getElementById('stDebt').textContent=fmtR(t.debt)+' ریال';
+    document.getElementById('stPaid').textContent=fmtR(t.paid)+' ریال';
+    document.getElementById('stRem').textContent=fmtR(t.remaining_debt)+' ریال';
+    document.getElementById('stDep').textContent=fmtR(t.deposited)+' ریال';
+    document.getElementById('stmtCard').style.display='';
+  }).catch(function(){});
+}
+function load(){
+  loadStatement();
+  Promise.all([
+    fetch('/api/finance/payments').then(function(r){return r.json();}),
+    fetch('/api/finance/summary').then(function(r){return r.json();})
+  ]).then(function(res){
+    var payments=res[0].payments, s=res[1].summary;
+    document.getElementById('sum').innerHTML=
+      '<div class="pill pill-ok">پرداخت‌شده: <b>'+fmtR(s.paid.amount)+' ریال</b></div>'+
+      '<div class="pill pill-warn">باقی‌مانده: <b>'+fmtR(s.unpaid.amount)+' ریال</b></div>'+
+      '<div class="pill pill-bad">معوق: <b>'+fmtR(s.overdue.amount)+' ریال</b></div>';
+    var lbl={paid:'✓ پرداخت‌شده',unpaid:'⏳ در انتظار',overdue:'⚠ معوق'};
+    var cls={paid:'b-ok',unpaid:'b-warn',overdue:'b-bad'};
+    document.getElementById('list').innerHTML=payments.length?payments.map(function(p,i){
+      var project=p.booklet&&p.booklet.project_name?'📁 '+p.booklet.project_name+' &nbsp;·&nbsp; ':'';
+      var paidInfo=p.paid_date?' &nbsp;·&nbsp; پرداخت: <b>'+p.paid_date+'</b>':'';
+      var receipt='';
+      if(p.receipt_path){
+        if(/\.(jpg|jpeg|png|gif|webp)$/i.test(p.receipt_path)){
+          receipt='<a href="#" class="badge b-ok" style="margin-top:4px;cursor:pointer" onclick="imgViewer.open({src:\'/uploads/'+p.receipt_path+'\',label:'+JSON.stringify(p.due_date)+'});return false;">✓ مشاهده فیش</a>';
+        } else {
+          receipt='<a href="/uploads/'+p.receipt_path+'" target="_blank" class="badge b-ok" style="margin-top:4px">✓ فیش آپلودشده</a>';
+        }
+      }
+      var uploadBtn='';
+      if(p.status!=='paid'){
+        uploadBtn='<div style="display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap">'+
+          '<input type="file" id="f'+p.id+'" accept="image/*,application/pdf" style="font-size:11px;max-width:140px">'+
+          '<button class="btn btn-gold btn-sm" onclick="upload('+p.id+',this)">ارسال فیش</button>'+
+          '</div>';
+      }
+      return '<div class="pay-card '+p.status+'" style="animation-delay:'+i*40+'ms">'+
+        '<div>'+
+        '<div class="pay-desc">'+(p.description||p.plan&&p.plan.title||'قسط')+'</div>'+
+        '<div class="pay-meta">'+project+'سررسید: <b>'+p.due_date+'</b>'+paidInfo+'</div>'+
+        '</div>'+
+        '<div class="pay-right">'+
+        '<div class="pay-amount">'+fmtR(p.amount)+' ریال</div>'+
+        '<span class="badge '+cls[p.status]+'">'+lbl[p.status]+'</span>'+
+        uploadBtn+receipt+
+        '</div></div>';
+    }).join(''):'<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>قسطی ثبت نشده</div>';
+  });
+}
+function upload(id,btn){
+  var file=document.getElementById('f'+id).files[0]; if(!file)return;
+  btnLoading(btn,true);
+  var fd=new FormData(); fd.append('receipt',file);
+  fetch('/api/finance/payments/'+id+'/upload',{method:'POST',body:fd}).then(function(r){
+    btnLoading(btn,false); if(r.ok){toast('فیش آپلود شد');load();}
+  });
+}
+load();
+</script>
+{% endblock %}

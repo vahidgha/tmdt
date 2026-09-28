@@ -1,0 +1,40 @@
+{
+  "name": "هیئت امنای مسکن دادگستری زنجان",
+  "short_name": "هیئت امنا",
+  "description": "سامانه دفترچه مالکیت هیئت امنای مسکن دادگستری زنجان",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/dashboard/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0E1B32",
+  "theme_color": "#0E1B32",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "اعضا و دفترچه‌ها",
+      "url": "/dashboard/members",
+      "icons": [{"src": "/static/icons/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "مالی و اقساط",
+      "url": "/dashboard/finance",
+      "icons": [{"src": "/static/icons/icon-192.png", "sizes": "192x192"}]
+    }
+  ]
+}

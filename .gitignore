@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+.env
+
+# Database
+*.db
+*.sqlite
+
+# Uploads
+static/uploads/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Backups
+backups/
+logs/

@@ -1,0 +1,118 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">قرارداد دفترچه</h1>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost no-print" onclick="window.print()">🖨 چاپ / PDF</button>
+    <a href="/dashboard/members" class="btn btn-ghost no-print">← بازگشت</a>
+  </div>
+</div>
+<div id="contractContent">در حال بارگذاری…</div>
+
+<style>
+@media print {
+  .hdr,.sidebar,.pg-hdr,.no-print { display:none!important }
+  .main { padding:0!important }
+  .contract-page { margin:0; box-shadow:none; border:none; }
+}
+.contract-page { background:#fff; max-width:800px; margin:0 auto; padding:36px 40px; border:1px solid var(--border); border-radius:14px; font-size:13px; line-height:2; color:#111; }
+.ct-header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1E2A42; padding-bottom:16px; margin-bottom:20px; }
+.ct-logo-block { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.ct-logo { width:64px; height:64px; background:#AD8A4D; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.ct-org { font-size:12px; font-weight:700; text-align:center; color:#1E2A42; }
+.ct-title { font-size:20px; font-weight:900; color:#1E2A42; text-align:center; flex:1; align-self:center; }
+.ct-code { text-align:left; font-size:12px; color:#555; }
+.ct-section { margin-bottom:18px; }
+.ct-section-title { font-size:13px; font-weight:800; color:#AD8A4D; border-bottom:1.5px solid #AD8A4D; padding-bottom:5px; margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+.ct-row { display:flex; gap:8px; margin-bottom:4px; }
+.ct-lbl { color:#555; min-width:140px; flex-shrink:0; }
+.ct-val { font-weight:700; }
+.ct-clause { background:#F9F6EE; border-right:3px solid #AD8A4D; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px; font-size:12.5px; }
+.ct-sigs { display:flex; justify-content:space-between; margin-top:40px; gap:20px; }
+.ct-sig-box { flex:1; text-align:center; border-top:1px dashed #aaa; padding-top:12px; font-size:12px; color:#555; }
+.ct-sig-name { font-weight:800; color:#111; margin-bottom:4px; }
+.ct-stamp { width:80px; height:80px; border:1.5px dashed #aaa; border-radius:50%; margin:0 auto 8px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#aaa; }
+</style>
+
+
+{% endblock %}
+{% block scripts %}
+<script>
+function fmtR(n){ return Number(n||0).toLocaleString(); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function load(){
+  var bid = parseInt('{{ booklet_id }}');
+  fetch('/api/booklets/'+bid+'/contract').then(function(r){
+    if(!r.ok){document.getElementById('contractContent').innerHTML='<div class="alert alert-bad">دفترچه یافت نشد.</div>';return;}
+    return r.json();
+  }).then(function(data){
+    if(!data)return;
+    var b=data.booklet, u=data.owner, p=data.project, s=data.settings;
+    var shareLabel=b.share_type==='full'?'تمام‌سهم':'نیم‌سهم';
+    var today=new Date().toLocaleDateString('fa-IR');
+
+    function row(label, val){
+      if(!val) return '';
+      return '<div class="ct-row"><span class="ct-lbl">'+esc(label)+':</span><span class="ct-val">'+esc(val)+'</span></div>';
+    }
+
+    var projSection=
+      row('نام پروژه', p.name)+
+      row('آدرس پروژه', p.address)+
+      row('منطقه', p.location)+
+      row('تاریخ شروع', p.start_date)+
+      row('تاریخ تحویل', p.end_date)+
+      row('نوع سهم', shareLabel)+
+      row('شماره قرارداد', b.contract_no)+
+      (b.contract_amount?row('مبلغ قرارداد', fmtR(b.contract_amount)+' ریال'):'');
+
+    document.getElementById('contractContent').innerHTML=
+      '<div class="contract-page">'+
+      '<div class="ct-header">'+
+        '<div class="ct-logo-block">'+
+          '<div class="ct-logo"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1A2035" stroke-width="2.3" stroke-linecap="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>'+
+          '<div class="ct-org">'+esc(s.site_title||'هیئت امنای مسکن دادگستری زنجان')+'</div>'+
+        '</div>'+
+        '<div class="ct-title">قرارداد دفترچه مالکیت</div>'+
+        '<div class="ct-code">'+
+          '<div>شماره دفترچه:</div>'+
+          '<div style="font-family:monospace;font-weight:800;font-size:15px;color:#AD8A4D">'+esc(b.code)+'</div>'+
+          '<div style="margin-top:4px">نوع: '+shareLabel+'</div>'+
+          '<div>تاریخ: '+esc(b.contract_date||today)+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="ct-section"><div class="ct-section-title">موضوع</div>'+
+        '<div class="ct-clause">این قرارداد بین هیئت امنای مسکن دادگستری استان زنجان به عنوان طرف اول و شخص با مشخصات زیر به عنوان طرف دوم در خصوص واگذاری یک واحد '+shareLabel+' از پروژه «'+esc(p.name)+'» منعقد می‌گردد.</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">'+
+        '<div class="ct-section"><div class="ct-section-title">طرف اول (هیئت امنا)</div>'+
+          row('مدیر اجرایی', s.exec_manager||'علی غفاری')+
+          row('نماینده هیئت', s.board_rep||'خلیل باقری')+
+          row('سمت', s.board_title||'هیئت رئیسه امنای مسکن')+
+        '</div>'+
+        '<div class="ct-section"><div class="ct-section-title">طرف دوم (خریدار)</div>'+
+          row('نام و نام خانوادگی', u.first_name+' '+u.last_name)+
+          row('نام پدر', u.father_name)+
+          row('کد ملی', u.national_code)+
+          row('شماره تماس', u.phone)+
+          row('آدرس', u.address)+
+        '</div>'+
+      '</div>'+
+      '<div class="ct-section"><div class="ct-section-title">مشخصات پروژه</div>'+projSection+'</div>'+
+      '<div class="ct-section" style="margin-top:16px"><div class="ct-section-title">شروط قرارداد</div>'+
+        '<div class="ct-clause">۱. طرف دوم متعهد می‌گردد اقساط تعیین‌شده را در موعد مقرر پرداخت نماید.</div>'+
+        '<div class="ct-clause">۲. هرگونه نقل و انتقال دفترچه منوط به موافقت کتبی هیئت امنا می‌باشد.</div>'+
+        '<div class="ct-clause">۳. در صورت عدم پرداخت سه قسط متوالی، هیئت امنا حق فسخ قرارداد را دارد.</div>'+
+        '<div class="ct-clause">۴. این قرارداد در دو نسخه تنظیم و هر دو نسخه دارای اعتبار یکسان است.</div>'+
+      '</div>'+
+      '<div class="ct-sigs">'+
+        '<div class="ct-sig-box"><div class="ct-stamp">مهر</div><div class="ct-sig-name">'+esc(s.exec_manager||'علی غفاری')+'</div><div>مدیر اجرایی</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
+        '<div class="ct-sig-box"><div class="ct-stamp">مهر</div><div class="ct-sig-name">'+esc(s.board_rep||'خلیل باقری')+'</div><div>'+esc(s.board_title||'هیئت رئیسه')+'</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
+        '<div class="ct-sig-box"><div class="ct-stamp">اثر انگشت</div><div class="ct-sig-name">'+esc(u.first_name)+' '+esc(u.last_name)+'</div><div>طرف دوم قرارداد</div><div style="margin-top:18px;border-top:1px solid #ddd;padding-top:6px">امضا</div></div>'+
+      '</div>'+
+      '</div>';
+  });
+}
+load();
+</script>
+{% endblock %}

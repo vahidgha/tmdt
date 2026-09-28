@@ -1,0 +1,67 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">تاریخچه نقل و انتقال‌ها</h1>
+</div>
+
+<div class="filter-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+  <select class="input" id="fProject" onchange="load()" style="max-width:220px;flex:1">
+    <option value="">همه پروژه‌ها</option>
+  </select>
+  <input class="input" id="fName" placeholder="نام مالک جدید…" oninput="searchChanged()" style="max-width:200px;flex:1">
+  <input class="input" id="fFrom" type="text" data-jdp onchange="load()" placeholder="از تاریخ" style="max-width:160px;flex:1" title="از تاریخ">
+  <input class="input" id="fTo"   type="text" data-jdp onchange="load()" placeholder="تا تاریخ" style="max-width:160px;flex:1" title="تا تاریخ">
+</div>
+
+<div class="card">
+  <div class="tbl-scroll-hint">برای مشاهده همه ستون‌ها، جدول را بکشید</div>
+  <div class="tbl-wrap">
+    <table class="tbl"><thead><tr>
+      <th>دفترچه</th><th>پروژه</th><th>از</th><th>به</th><th>تاریخ</th>
+    </tr></thead><tbody id="tbody"></tbody></table>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var _historySearchTimer=null;
+function searchChanged(){ clearTimeout(_historySearchTimer); _historySearchTimer=setTimeout(load,400); }
+function load() {
+  var params = new URLSearchParams();
+  var pid = document.getElementById('fProject').value;
+  var name = document.getElementById('fName').value.trim();
+  var from = document.getElementById('fFrom').value;
+  var to   = document.getElementById('fTo').value;
+  if (pid)  params.set('project_id', pid);
+  if (name) params.set('name', name);
+  if (from) params.set('date_from', from);
+  if (to)   params.set('date_to', to);
+  fetch('/api/history?' + params.toString()).then(function(r){return r.json();}).then(function(d){
+    var tb = document.getElementById('tbody');
+    if (!d.history || !d.history.length) {
+      tb.innerHTML = '<tr><td colspan="5"><div class="empty" style="padding:24px">هیچ انتقالی ثبت نشده</div></td></tr>';
+      return;
+    }
+    tb.innerHTML = d.history.map(function(h){
+      return '<tr>' +
+        '<td class="mono">' + esc(h.booklet_code) + '</td>' +
+        '<td>' + esc(h.project_name||'—') + '</td>' +
+        '<td>' + esc(h.from_name) + '</td>' +
+        '<td>' + esc(h.to_name) + '</td>' +
+        '<td>' + new Date(h.date).toLocaleDateString('fa-IR') + '</td>' +
+        '</tr>';
+    }).join('');
+  });
+}
+
+fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+  var sel = document.getElementById('fProject');
+  sel.innerHTML = '<option value="">همه پروژه‌ها</option>' +
+    d.projects.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');
+});
+
+load();
+</script>
+{% endblock %}

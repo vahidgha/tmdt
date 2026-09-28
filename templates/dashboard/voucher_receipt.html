@@ -1,0 +1,54 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<style>
+.rcpt{max-width:640px;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:14px;padding:28px}
+.rcpt-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--navy);padding-bottom:14px;margin-bottom:18px}
+.rcpt-title{font-size:20px;font-weight:900;color:var(--navy)}
+.rcpt-no{font-size:13px;color:var(--muted)}
+.rcpt-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--border);font-size:14px}
+.rcpt-row .k{color:var(--muted)}
+.rcpt-row .v{font-weight:700}
+.rcpt-amount{background:var(--bg);border-radius:10px;padding:14px;text-align:center;margin:16px 0}
+.rcpt-amount b{font-size:26px;color:var(--navy)}
+.rcpt-foot{margin-top:22px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.rcpt-stamp{margin-top:34px;text-align:left}
+@media print{.no-print{display:none!important}.shell,.hdr,.sidebar{display:none!important}.main{padding:0!important}.rcpt{border:none}}
+</style>
+
+<div class="no-print" style="max-width:640px;margin:0 auto 14px;display:flex;gap:8px">
+  <button class="btn btn-navy" onclick="window.print()">🖨 چاپ رسید</button>
+  <a class="btn btn-ghost" href="/dashboard/accounting">بازگشت</a>
+</div>
+
+<div class="rcpt">
+  <div class="rcpt-head">
+    <div>
+      <div class="rcpt-title">{{ site_settings.get('site_title','تعاونی مسکن') }}</div>
+      <div style="font-size:12px;color:var(--muted)">رسید سند واریز</div>
+    </div>
+    <div style="text-align:left">
+      <div class="rcpt-no">شماره سند: <b>#{{ v.number }}</b></div>
+      {% if v.status == 'voided' %}<div style="color:#c0392b;font-weight:800;margin-top:4px">— ابطال‌شده —</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="rcpt-row"><span class="k">واریزکننده</span><span class="v">{{ v.payer_name }}</span></div>
+  <div class="rcpt-row"><span class="k">به حساب</span><span class="v">{{ v.account_label }}</span></div>
+  <div class="rcpt-row"><span class="k">تاریخ واریز</span><span class="v">{{ v.deposit_date }}{% if v.deposit_time %} — ساعت {{ v.deposit_time }}{% endif %}</span></div>
+  <div class="rcpt-row"><span class="k">روش واریز</span><span class="v">
+    {% set m = {'card':'کارت به کارت','transfer':'انتقال بانکی','cash':'نقدی','cheque':'چک','other':'سایر'} %}{{ m.get(v.method, v.method) }}</span></div>
+  {% if v.reference_no %}<div class="rcpt-row"><span class="k">شماره پیگیری</span><span class="v mono">{{ v.reference_no }}</span></div>{% endif %}
+  {% if v.description %}<div class="rcpt-row"><span class="k">شرح</span><span class="v">{{ v.description }}</span></div>{% endif %}
+
+  <div class="rcpt-amount">
+    <div style="font-size:12px;color:var(--muted)">مبلغ واریز</div>
+    <b>{{ "{:,}".format(v.amount) }}</b> <span style="font-size:13px">ریال</span>
+  </div>
+
+  <div class="rcpt-foot">
+    <span>ثبت‌کننده: {{ v.created_by_name or '—' }}</span>
+    <span>تاریخ صدور رسید: {{ v.created_at[:10] }}</span>
+  </div>
+  <div class="rcpt-stamp">مهر و امضای تعاونی</div>
+</div>
+{% endblock %}

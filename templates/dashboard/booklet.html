@@ -1,0 +1,282 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">دفترچه‌های مالکیت من</h1>
+  <button class="btn btn-ghost no-print" onclick="window.print()">🖨 چاپ</button>
+</div>
+
+<!-- ── بله Bot Link Card ── -->
+<div class="bale-card no-print" id="baleCard">
+  <div class="bale-logo">
+    <img src="/static/img/bale_logo.png" alt="بله" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" style="width:36px;height:36px;object-fit:contain">
+    <div style="display:none;width:36px;height:36px;background:#3B82F6;border-radius:50%;align-items:center;justify-content:center;font-size:18px">💬</div>
+  </div>
+  <div class="bale-info">
+    <div class="bale-title">پیام‌رسان بله</div>
+    <div class="bale-sub" id="baleSubText">در حال بررسی…</div>
+  </div>
+  <div id="baleBtns">
+    <button class="btn btn-navy btn-sm" id="baleLinkBtn" onclick="getCode()" style="display:none">پیوند حساب</button>
+    <button class="btn btn-ghost btn-sm" id="baleUnlinkBtn" onclick="unlinkBale()" style="display:none">جدا کردن</button>
+  </div>
+</div>
+
+<!-- Modal: کد پیوند بله -->
+<div class="modal" id="baleLinkModal">
+  <div class="modal-box" style="max-width:400px;text-align:center">
+    <div class="modal-head"><span class="modal-title">پیوند حساب بله</span><button class="modal-x" onclick="modal.close('baleLinkModal')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.7">این کد را در ربات بله ارسال کنید تا حسابتان پیوند شود و اطلاعیه‌ها دریافت کنید.</p>
+      <div id="baleCode" style="font-size:40px;font-weight:900;letter-spacing:8px;color:var(--navy);font-family:monospace;background:var(--bg-alt,#f5f5f5);padding:16px 24px;border-radius:12px;margin:0 auto 16px;display:inline-block">------</div>
+      <p style="font-size:12px;color:var(--muted)">این کد یک‌بار مصرف است و پس از استفاده نامعتبر می‌شود.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="modal.close('baleLinkModal')">بستن</button>
+    </div>
+  </div>
+</div>
+
+<div id="content">در حال بارگذاری…</div>
+
+<!-- Modal: درخواست انتقال -->
+<div class="modal" id="transferModal">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-head"><span class="modal-title" id="transferTitle">درخواست نقل و انتقال</span><button class="modal-x" onclick="modal.close('transferModal')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="trBookletId">
+      <div id="transferErr" class="alert alert-bad" style="display:none"></div>
+      <div class="grid-2">
+        <div class="field"><label>نام مالک جدید *</label><input class="input" id="trFn" placeholder="نام"></div>
+        <div class="field"><label>نام خانوادگی *</label><input class="input" id="trLn" placeholder="نام خانوادگی"></div>
+        <div class="field"><label>کد ملی *</label><input class="input mono" id="trNat" inputmode="numeric" maxlength="10"></div>
+        <div class="field"><label>موبایل *</label><input class="input" id="trPh" inputmode="numeric" dir="ltr" maxlength="11" placeholder="09xxxxxxxxx"></div>
+        <div class="field span-2"><label>توضیحات</label><input class="input" id="trNote" placeholder="اختیاری"></div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">بارگذاری مدارک</p>
+      <div class="grid-2">
+        <div class="field"><label>فیش واریزی *</label><input type="file" class="input" id="trReceipt" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>قول‌نامه / توافق‌نامه *</label><input type="file" class="input" id="trAgreement" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>شناسنامه *</label><input type="file" class="input" id="trIdFirst" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>کارت ملی (جلو) *</label><input type="file" class="input" id="trNatFront" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>کارت ملی (پشت) *</label><input type="file" class="input" id="trNatBack" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>سند اختیاری ۱</label><input type="file" class="input" id="trExtra1" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>سند اختیاری ۲</label><input type="file" class="input" id="trExtra2" accept="image/*,.pdf" style="padding:6px"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="submitTransfer()">ثبت درخواست</button>
+      <button class="btn btn-ghost" onclick="modal.close('transferModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print { .hdr,.sidebar,.pg-hdr,.no-print { display:none!important } .main { padding:0!important } }
+.booklet-card { background:var(--card); border:1px solid var(--border); border-radius:14px; margin-bottom:18px; overflow:hidden; }
+.doc-banner { background:linear-gradient(135deg,var(--navy) 0%,#1a3060 100%); color:#F2EBD8; padding:20px 24px; display:flex; justify-content:space-between; align-items:flex-start; }
+.doc-code { font-size:17px; font-weight:900; font-family:monospace; color:var(--gold); letter-spacing:.5px; margin-top:4px; }
+.doc-section { padding:16px 20px; border-top:1px solid var(--border); }
+.doc-sec-label { font-size:11px; font-weight:800; color:var(--gold); text-transform:uppercase; letter-spacing:.8px; margin-bottom:10px; }
+.doc-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(0,0,0,.04); font-size:13px; }
+.doc-key { color:var(--muted); }
+.doc-val { font-weight:600; }
+.doc-grid { display:grid; grid-template-columns:1fr 1fr; }
+@media(max-width:640px){ .doc-grid { grid-template-columns:1fr; } }
+.doc-footer { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-top:1px solid var(--border); font-size:12px; color:var(--muted); }
+.pill { background:var(--bg-alt,#f0f4fa); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:12px; display:inline-flex; align-items:center; gap:4px; }
+.pill-ok { background:rgba(34,197,94,.08); border-color:rgba(34,197,94,.2); color:#16a34a; }
+.pill-warn { background:rgba(245,158,11,.08); border-color:rgba(245,158,11,.2); color:#b45309; }
+/* Bale card */
+.bale-card { display:flex; align-items:center; gap:14px; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px 18px; margin-bottom:18px; }
+.bale-logo { flex-shrink:0; }
+.bale-info { flex:1; }
+.bale-title { font-weight:700; font-size:14px; }
+.bale-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+/* ── Bale Bot ── */
+function checkBaleStatus(){
+  fetch('/api/bale/status').then(function(r){return r.json();}).then(function(d){
+    var sub=document.getElementById('baleSubText');
+    var linkBtn=document.getElementById('baleLinkBtn');
+    var unlinkBtn=document.getElementById('baleUnlinkBtn');
+    if(d.linked){
+      sub.textContent='حساب بله شما پیوند شده است ✅';
+      sub.style.color='#16a34a';
+      linkBtn.style.display='none';
+      unlinkBtn.style.display='';
+    } else {
+      sub.textContent='پیوند نشده — برای دریافت اطلاعیه‌ها حساب خود را پیوند دهید';
+      sub.style.color='';
+      linkBtn.style.display='';
+      unlinkBtn.style.display='none';
+    }
+  });
+}
+
+function getCode(){
+  fetch('/api/bale/link-code').then(function(r){return r.json();}).then(function(d){
+    document.getElementById('baleCode').textContent = d.code;
+    modal.open('baleLinkModal');
+  });
+}
+
+function unlinkBale(){
+  if(!confirm('آیا می‌خواهید حساب بله خود را جدا کنید؟')) return;
+  fetch('/api/bale/unlink',{method:'POST'}).then(function(){
+    toast('حساب بله جدا شد'); checkBaleStatus();
+  });
+}
+
+checkBaleStatus();
+
+function fmtR(n){ return Number(n||0).toLocaleString(); }
+function rows(pairs){
+  return pairs.filter(function(x){return x[1];}).map(function(x){
+    return '<div class="doc-row"><span class="doc-key">'+esc(x[0])+'</span><span class="doc-val">'+esc(x[1])+'</span></div>';
+  }).join('');
+}
+
+function openTransferModal(bookletId, bookletCode) {
+  document.getElementById('trBookletId').value = bookletId;
+  document.getElementById('transferTitle').textContent = 'درخواست نقل و انتقال — ' + bookletCode;
+  ['trFn','trLn','trNat','trPh','trNote'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['trReceipt','trAgreement','trIdFirst','trNatFront','trNatBack','trExtra1','trExtra2'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('transferErr').style.display='none';
+  modal.open('transferModal');
+}
+
+function submitTransfer(){
+  var errEl=document.getElementById('transferErr'); errEl.style.display='none';
+  var btn=document.querySelector('#transferModal .btn-navy');
+
+  var fd=new FormData();
+  fd.append('booklet_id',  document.getElementById('trBookletId').value);
+  fd.append('new_owner_first_name',  document.getElementById('trFn').value.trim());
+  fd.append('new_owner_last_name',   document.getElementById('trLn').value.trim());
+  fd.append('new_owner_national_code', document.getElementById('trNat').value.trim());
+  fd.append('new_owner_phone',       document.getElementById('trPh').value.trim());
+  fd.append('note',                  document.getElementById('trNote').value.trim());
+
+  // اعتبارسنجی فیلدهای اجباری
+  if(!fd.get('new_owner_first_name')||!fd.get('new_owner_last_name')||!fd.get('new_owner_national_code')||!fd.get('new_owner_phone')){
+    errEl.textContent='همه فیلدهای مالک جدید الزامی است.'; errEl.style.display=''; return;
+  }
+
+  // بررسی مدارک الزامی
+  var requiredFiles={receipt:'trReceipt',agreement:'trAgreement',id_first_page:'trIdFirst',national_front:'trNatFront',national_back:'trNatBack'};
+  var requiredLabels={receipt:'فیش واریزی',agreement:'قول‌نامه / توافق‌نامه',id_first_page:'شناسنامه',national_front:'کارت ملی (جلو)',national_back:'کارت ملی (پشت)'};
+  var MAX_FILE=8*1024*1024;
+  for(var k in requiredFiles){
+    var f=document.getElementById(requiredFiles[k]).files[0];
+    if(!f){errEl.textContent='بارگذاری «'+requiredLabels[k]+'» الزامی است.';errEl.style.display='';return;}
+    if(f.size>MAX_FILE){errEl.textContent='فایل «'+f.name+'» بیش از ۸ مگابایت است.';errEl.style.display='';return;}
+    fd.append(k,f);
+  }
+  // دو سند اختیاری → sana_form و extra_photo
+  var optionalFiles={sana_form:'trExtra1',extra_photo:'trExtra2'};
+  for(var ok in optionalFiles){
+    var of=document.getElementById(optionalFiles[ok]).files[0];
+    if(of){
+      if(of.size>MAX_FILE){errEl.textContent='فایل «'+of.name+'» بیش از ۸ مگابایت است.';errEl.style.display='';return;}
+      fd.append(ok,of);
+    }
+  }
+
+  btn.disabled=true; btn.textContent='در حال ارسال…';
+  fetch('/api/requests',{method:'POST',body:fd})
+    .then(function(r){
+      if(r.status===413) throw new Error('حجم فایل‌ها بیش از حد مجاز است. هر فایل را جداگانه و با حجم کمتر آپلود کنید.');
+      return r.json().then(function(d){return {ok:r.ok,d:d};});
+    })
+    .then(function(x){
+      if(!x.ok){errEl.textContent=x.d.error||'خطا در ارسال';errEl.style.display='';return;}
+      modal.close('transferModal');toast('درخواست انتقال با موفقیت ثبت شد');
+    })
+    .catch(function(e){errEl.textContent=e.message||'خطا در ارتباط با سرور';errEl.style.display='';})
+    .finally(function(){btn.disabled=false;btn.textContent='ثبت درخواست';});
+}
+
+function load(){
+  Promise.all([
+    fetch('/api/profile/me').then(function(r){return r.json();}),
+    fetch('/api/finance/summary').then(function(r){return r.json();})
+  ]).then(function(res){
+    var u=res[0].user, booklets=res[0].booklets, s=res[1].summary;
+    if(!booklets || !booklets.length){
+      document.getElementById('content').innerHTML='<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>دفترچه‌ای ثبت نشده</div>';
+      return;
+    }
+    var bankSection='';
+    if(u.bank_name){
+      bankSection='<div class="doc-section">'+
+        '<div class="doc-sec-label">اطلاعات بانکی</div>'+
+        rows([['بانک',u.bank_name],['شماره حساب',u.account_number],['شبا',u.iban]])+
+        '</div>';
+    }
+
+    var html = '';
+    booklets.forEach(function(b, idx){
+      var shareLabel=b.share_type==='full'?'تمام‌سهم':'نیم‌سهم';
+      var shareClass=b.share_type==='full'?'b-ok':'b-warn';
+      var contractAmt=b.contract_amount?'<span class="pill">مبلغ: <b>'+fmtR(b.contract_amount)+' ریال</b></span>':'';
+      var serialLabel=b.serial?'<span class="pill">ردیف: <b>#'+b.serial+'</b></span>':'';
+      var bookletNumLabel=b.booklet_number?'<span class="pill">شماره دفترچه: <b>'+esc(b.booklet_number)+'</b></span>':'';
+
+      html += '<div class="booklet-card">'+
+        '<div class="doc-banner">'+
+          '<div>'+
+            '<div style="font-size:11px;opacity:.55;margin-bottom:4px">هیئت امنای مسکن دادگستری زنجان</div>'+
+            '<div style="font-size:18px;font-weight:900">دفترچه مالکیت '+(booklets.length>1?'('+(idx+1)+' از '+booklets.length+')':'')+'</div>'+
+            '<div style="font-size:12px;opacity:.7;margin-top:4px">'+esc(b.project_name||'')+'</div>'+
+          '</div>'+
+          '<div style="text-align:left">'+
+            '<div style="font-size:11px;opacity:.55">کد داخلی</div>'+
+            '<div class="doc-code">'+esc(b.code)+'</div>'+
+            '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
+              '<span class="badge '+shareClass+'">'+shareLabel+'</span>'+
+              '<button class="btn btn-ghost btn-sm no-print" onclick="openTransferModal('+b.id+',\''+b.code.replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')" style="height:28px;padding:0 10px;font-size:11px">درخواست انتقال</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="doc-grid">'+
+          '<div class="doc-section">'+
+            '<div class="doc-sec-label">مشخصات مالک</div>'+
+            rows([['نام',u.first_name],['نام خانوادگی',u.last_name],['نام پدر',u.father_name],['کد ملی',u.national_code],['جنسیت',u.gender],['تاریخ تولد',u.birth_date],['شغل',u.occupation]])+
+          '</div>'+
+          '<div class="doc-section">'+
+            '<div class="doc-sec-label">اطلاعات تماس</div>'+
+            rows([['موبایل',u.phone],['تماس ضروری',u.emergency_phone],['تلفن ثابت',u.landline],['ایمیل',u.email],['کد پستی',u.postal_code]])+
+            (u.address?'<div class="doc-row" style="flex-direction:column;gap:4px"><span class="doc-key">آدرس</span><span style="font-size:12.5px;margin-top:4px">'+esc(u.address)+'</span></div>':'')+
+          '</div>'+
+        '</div>'+
+        '<div class="doc-section">'+
+          '<div class="doc-sec-label">اطلاعات دفترچه و مالی</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+
+            serialLabel+
+            bookletNumLabel+
+            (b.contract_no?'<span class="pill">قرارداد: <b>'+esc(b.contract_no)+'</b></span>':'')+
+            contractAmt+
+            (b.contract_date?'<span class="pill">تاریخ: <b>'+esc(b.contract_date)+'</b></span>':'')+
+            '<span class="pill pill-ok">پرداخت‌شده: <b>'+fmtR(s.paid.amount)+' ریال</b></span>'+
+            '<span class="pill pill-warn">باقی: <b>'+fmtR(s.unpaid.amount)+' ریال</b></span>'+
+          '</div>'+
+        '</div>'+
+        bankSection+
+        '<div class="doc-footer">'+
+          '<span>تاریخ صدور: '+new Date().toLocaleDateString('fa-IR')+'</span>'+
+          '<div style="width:72px;height:72px;border:1.5px dashed var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)">مهر</div>'+
+          '<span>هیئت امنای مسکن دادگستری زنجان</span>'+
+        '</div>'+
+      '</div>';
+    });
+    document.getElementById('content').innerHTML = html;
+  });
+}
+load();
+</script>
+{% endblock %}

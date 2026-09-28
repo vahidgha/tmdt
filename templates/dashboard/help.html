@@ -1,0 +1,361 @@
+{% extends "dashboard/layout.html" %}
+{% block head %}
+<style>
+.help-hero{background:linear-gradient(145deg,var(--navy-mid) 0%,var(--navy) 100%);border:1px solid rgba(184,146,90,.18);border-radius:var(--r2);padding:22px 26px;color:#F0EAD8;margin-bottom:20px}
+.help-hero h1{font-size:19px;font-weight:900;margin-bottom:6px}
+.help-hero p{font-size:13px;color:rgba(242,235,216,.65);line-height:1.8;margin:0}
+.help-group{margin-bottom:22px}
+.help-group-title{font-size:12px;font-weight:900;color:var(--muted2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.help-item{border:1px solid var(--border);border-radius:var(--r2);background:var(--card);margin-bottom:8px;overflow:hidden}
+.help-item summary{padding:13px 16px;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;list-style:none;color:var(--text)}
+.help-item summary::-webkit-details-marker{display:none}
+.help-item summary::after{content:'+';font-size:18px;font-weight:400;color:var(--muted);transition:transform var(--t-fast)}
+.help-item[open] summary::after{transform:rotate(45deg)}
+.help-item summary:hover{background:var(--bg-alt)}
+.help-item-body{padding:0 16px 16px;font-size:13px;color:var(--text2);line-height:1.9}
+.help-item-body ol,.help-item-body ul{margin:8px 0 0 0;padding-inline-start:20px}
+.help-item-body li{margin-bottom:5px}
+.help-item-body a.help-link{color:var(--gold-deep);font-weight:700;text-decoration:none}
+.help-item-body a.help-link:hover{text-decoration:underline}
+.help-search{margin-bottom:18px}
+</style>
+{% endblock %}
+{% block content %}
+<div class="help-hero">
+  <h1>راهنمای استفاده از سامانه</h1>
+  <p>در این صفحه توضیح داده شده هر بخش از پنل چه کاری انجام می‌دهد و چطور از آن استفاده کنید. روی هر عنوان کلیک کنید تا توضیح کامل باز شود.</p>
+</div>
+
+<input class="input help-search" id="helpSearch" placeholder="جستجو در راهنما… (مثال: دفترچه، قسط، تیکت)" oninput="filterHelp()">
+
+<div id="helpContent">
+
+{% if user.role == 'admin' %}
+
+<div class="help-group">
+  <div class="help-group-title">مدیریت</div>
+
+  <details class="help-item">
+    <summary>اطلاعیه‌ها — چطور خبر جدید منتشر کنم؟</summary>
+    <div class="help-item-body">
+      از این بخش می‌توانید اطلاعیه‌های سایت عمومی و پنل داشبورد را مدیریت کنید.
+      <ol>
+        <li>روی «+ اطلاعیه جدید» بزنید.</li>
+        <li>عنوان، متن، و در صورت نیاز تصویر را وارد کنید.</li>
+        <li>می‌توانید تاریخ انتشار (برای زمان‌بندی) و تاریخ انقضا تعیین کنید.</li>
+        <li>اطلاعیه‌ها هم در صفحه عمومی سایت و هم برای اعضای واردشده نمایش داده می‌شوند.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/announcements">رفتن به اطلاعیه‌ها ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>پروژه‌ها — چطور پروژه ساختمانی اضافه کنم؟</summary>
+    <div class="help-item-body">
+      پروژه‌های ساختمانی تعاونی (مثل «پروژه ثمین») اینجا تعریف می‌شوند و پایه‌ی دفترچه‌های اعضا هستند.
+      <ol>
+        <li>روی «+ پروژه جدید» بزنید و نام، وضعیت (در حال اجرا/تکمیل‌شده/آینده) و آدرس را وارد کنید.</li>
+        <li>می‌توانید گالری تصاویر و اعضای هیئت مدیره پروژه را هم اضافه کنید.</li>
+        <li>پروژه‌های فعال به‌صورت خودکار در صفحه عمومی سایت نمایش داده می‌شوند.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/projects">رفتن به پروژه‌ها ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>اعضا و دفترچه‌ها — چطور عضو و دفترچه جدید ثبت کنم؟</summary>
+    <div class="help-item-body">
+      قلب سامانه — هر عضو یک یا چند دفترچه مالکیت (سهم در یک پروژه) دارد.
+      <ol>
+        <li>روی «+ عضو جدید» بزنید؛ می‌توانید هم‌زمان یک دفترچه هم برایش بسازید (پروژه، نوع سهم، شماره قرارداد، مبلغ).</li>
+        <li>برای افزودن دفترچه به عضو موجود، از ردیف همان عضو دکمه «+ دفترچه» را بزنید.</li>
+        <li>برای وارد کردن گروهی اعضا، از «ورود از اکسل» استفاده کنید — اول «دانلود تمپلیت اکسل» را بگیرید، پر کنید، دوباره آپلود کنید.</li>
+        <li>هر دفترچه یک کد یکتا دارد (معمولاً همان شماره قرارداد) — دو دفترچه نمی‌توانند کد یکسان داشته باشند.</li>
+        <li>حذف دفترچه، آن را فقط مخفی می‌کند (سابقه مالی/انتقال برای حسابرسی حفظ می‌شود) و کد آن بلافاصله برای دفترچه جدید آزاد می‌شود.</li>
+        <li>در انتهای صفحه می‌توانید تعداد ردیف هر صفحه (۱۰ تا ۵۰) را انتخاب کنید.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/members">رفتن به اعضا و دفترچه‌ها ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>پرونده اعضا — یعنی چه فرقی با «اعضا» دارد؟</summary>
+    <div class="help-item-body">
+      این صفحه یک نمای فشرده و فقط-خواندنی از همه اعضا و دفترچه‌هایشان است — برای مرور سریع، جستجو، و مشاهده خلاصه پرونده هر نفر بدون نیاز به ویرایش.
+      <a class="help-link" href="/dashboard/member-profiles">رفتن به پرونده اعضا ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>نقل و انتقال — چطور درخواست انتقال مالکیت را بررسی کنم؟</summary>
+    <div class="help-item-body">
+      وقتی عضوی می‌خواهد دفترچه‌اش را به شخص دیگری منتقل کند، درخواست او اینجا می‌آید.
+      <ol>
+        <li>درخواست‌های «در انتظار» را بررسی کنید — مدارک بارگذاری‌شده (کارت ملی، فرم صنا، رسید و...) را چک کنید.</li>
+        <li>«تأیید اولیه» → به عضو گفته می‌شود مدارک را حضوری تحویل دهد (آدرس در تنظیمات سایت قابل تغییر است).</li>
+        <li>پس از دریافت مدارک، «تکمیل انتقال» را بزنید تا مالکیت رسماً به مالک جدید منتقل شود.</li>
+        <li>در صورت رد درخواست، دلیل را بنویسید تا برای عضو ثبت و نمایش داده شود.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/requests">رفتن به نقل و انتقال ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>تاریخچه — کجا سابقه انتقال‌های قبلی را ببینم؟</summary>
+    <div class="help-item-body">
+      فهرست کامل انتقالات مالکیت تکمیل‌شده (چه کسی، چه زمانی، کدام دفترچه) برای حسابرسی و پیگیری.
+      <a class="help-link" href="/dashboard/history">رفتن به تاریخچه ←</a>
+    </div>
+  </details>
+</div>
+
+<div class="help-group">
+  <div class="help-group-title">مالی</div>
+
+  <details class="help-item">
+    <summary>مالی و اقساط — چطور طرح پرداخت و قسط تعریف کنم؟</summary>
+    <div class="help-item-body">
+      <ol>
+        <li>از تب «طرح‌های پرداخت»، یک طرح جدید بسازید: مبلغ کل، تعداد قسط، تاریخ شروع.</li>
+        <li>اقساط به‌صورت خودکار برای اعضای مرتبط ساخته می‌شوند و در تب «اقساط» قابل مشاهده و پیگیری‌اند (پرداخت‌شده/معوق/در انتظار).</li>
+        <li>عضو می‌تواند فیش واریزی را از پنل خودش آپلود کند؛ شما آن را در همین‌جا تأیید می‌کنید.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/finance">رفتن به مالی و اقساط ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>اسناد واریز — تفاوت سند واریز با قسط چیست؟</summary>
+    <div class="help-item-body">
+      اینجا حسابداری کامل تعاونی است — نه فقط اقساط.
+      <ul>
+        <li><b>سند واریز</b>: ثبت واقعی پولی که به یک حساب تعاونی واریز شده (چه از طرف عضو، چه غیرعضو).</li>
+        <li><b>تخصیص</b>: هر سند واریز را می‌توانید به یک یا چند قسط «تخصیص» دهید تا آن قسط تسویه شود.</li>
+        <li><b>مانده حساب‌ها</b>: موجودی هر حساب بانکی تعاونی (واریزی منهای هزینه).</li>
+        <li><b>هزینه‌ها</b>: ثبت خروجی وجه (زمین، پیمانکار، اداری و...).</li>
+        <li><b>تفکیک پروژه</b>: وضعیت مالی هر پروژه به‌طور جداگانه.</li>
+        <li><b>بدهکاران</b>: فهرست اعضایی که بدهی دارند، به‌ترتیب بیشترین مانده — برای پیگیری سریع.</li>
+        <li>از کارت حساب هر عضو (که با کلیک روی نامش در «بدهکاران» باز می‌شود) می‌توانید سند دستی بدهکار/بستانکار (جریمه دیرکرد، تخفیف و...) هم ثبت کنید و مانده تجمعی (کاردکس) را ببینید.</li>
+        <li>هیچ سند مالی حذف نمی‌شود — فقط با ثبت دلیل «ابطال» می‌گردد تا سابقه حسابرسی حفظ شود.</li>
+      </ul>
+      <a class="help-link" href="/dashboard/accounting">رفتن به اسناد واریز ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>گزارش‌ساز — چطور گزارش سفارشی بسازم؟</summary>
+    <div class="help-item-body">
+      می‌توانید فیلدها، فیلترها، و بازه زمانی دلخواه را انتخاب کنید و خروجی اکسل بگیرید — بدون نیاز به دانش برنامه‌نویسی.
+      <a class="help-link" href="/dashboard/reports">رفتن به گزارش‌ساز ←</a>
+    </div>
+  </details>
+</div>
+
+<div class="help-group">
+  <div class="help-group-title">ارتباطات</div>
+
+  <details class="help-item">
+    <summary>اعلان‌ها — چطور به اعضا اعلان بفرستم؟</summary>
+    <div class="help-item-body">
+      اعلان‌های داخل‌پنلی (زنگوله بالای صفحه) که اعضا هنگام ورود می‌بینند — برای یادآوری قسط، اطلاع‌رسانی و...
+      <a class="help-link" href="/dashboard/notifications">رفتن به اعلان‌ها ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>ربات بله — چطور وصل کنم؟</summary>
+    <div class="help-item-body">
+      اعضا می‌توانند حساب بله خود را به سامانه وصل کنند تا اعلان‌ها و کد بازیابی رمز عبور را از طریق ربات بله هم دریافت کنند.
+      نام کاربری و توکن ربات از «مدیریت صفحه عمومی → تنظیمات سایت» تنظیم می‌شود.
+      <a class="help-link" href="/dashboard/bale">رفتن به ربات بله ←</a>
+    </div>
+  </details>
+</div>
+
+<div class="help-group">
+  <div class="help-group-title">سایت</div>
+
+  <details class="help-item">
+    <summary>صفحه عمومی — چطور اسلایدر، لوگو و تنظیمات سایت را عوض کنم؟</summary>
+    <div class="help-item-body">
+      <ul>
+        <li><b>اسلایدها</b>: تصاویر/ویدیوهای متحرک بالای صفحه اصلی سایت — از اینجا می‌توانید اضافه، ویرایش، حذف یا پنهان/نمایش کنید.</li>
+        <li><b>پروژه‌های نمایشی</b>: پروژه‌های فعال/تکمیل‌شده به‌صورت خودکار در صفحه عمومی نشان داده می‌شوند.</li>
+        <li><b>تنظیمات سایت</b>: نام تعاونی، لوگو (که در favicon و هدر هم استفاده می‌شود)، اطلاعات تماس، تنظیمات ربات بله و پیامک sms.ir، و تصاویر مسئولین/رهبران از همین‌جا مدیریت می‌شود.</li>
+      </ul>
+      <a class="help-link" href="/dashboard/landing">رفتن به مدیریت صفحه عمومی ←</a>
+    </div>
+  </details>
+</div>
+
+<div class="help-group">
+  <div class="help-group-title">پشتیبانی</div>
+
+  <details class="help-item">
+    <summary>تیکت‌ها — چطور به سؤال اعضا پاسخ بدهم؟</summary>
+    <div class="help-item-body">
+      اعضا از پنل خودشان تیکت پشتیبانی ثبت می‌کنند؛ شما اینجا می‌توانید فیلتر بر اساس وضعیت/اولویت/دسته بزنید، پاسخ بدهید، و وضعیت تیکت را تغییر دهید.
+      <a class="help-link" href="/dashboard/tickets">رفتن به تیکت‌ها ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>فرم‌ساز — چطور فرم سفارشی بسازم؟</summary>
+    <div class="help-item-body">
+      <ol>
+        <li>«+ فرم جدید» بزنید و فیلدها را با کشیدن‌ورها از پنل چپ به بوم وسط اضافه کنید (متن، عدد، تاریخ، فایل، امضا و...).</li>
+        <li>در «تنظیمات» می‌توانید فرم را عمومی یا فقط برای اعضای واردشده کنید، سقف تعداد پاسخ، و تاریخ انقضا تعیین کنید.</li>
+        <li><b>فرم اختصاصی</b>: اگر فقط عده خاصی باید فرم را پر کنند، در تنظیمات «فرم اختصاصی» را فعال کنید و از دکمه «افراد مجاز» لیست کد ملی/موبایل آن‌ها را دستی یا با اکسل وارد کنید.</li>
+        <li>پاسخ‌های ثبت‌شده را از «پاسخ‌ها» می‌بینید و می‌توانید اکسل بگیرید.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/forms">رفتن به فرم‌ساز ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>لاگ فعالیت‌ها — یعنی چه؟</summary>
+    <div class="help-item-body">
+      ثبت خودکار همه اقدام‌های مهم در سامانه (ساخت/حذف عضو، ثبت سند، تأیید انتقال و...) به همراه زمان و کاربر انجام‌دهنده — برای شفافیت و پیگیری.
+      <a class="help-link" href="/dashboard/activity-log">رفتن به لاگ فعالیت‌ها ←</a>
+    </div>
+  </details>
+</div>
+
+{% elif user.role == 'finance' %}
+
+<div class="help-group">
+  <div class="help-group-title">مالی</div>
+
+  <details class="help-item" open>
+    <summary>مالی و اقساط — چطور کار می‌کند؟</summary>
+    <div class="help-item-body">
+      اقساط اعضا اینجا قابل مشاهده و پیگیری‌اند (پرداخت‌شده/معوق/در انتظار). وقتی عضوی فیش واریز آپلود می‌کند، شما آن را تأیید می‌کنید.
+      <a class="help-link" href="/dashboard/finance">رفتن به مالی و اقساط ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>اسناد واریز، بدهکاران، و کارت حساب اعضا</summary>
+    <div class="help-item-body">
+      <ul>
+        <li><b>سند واریز</b>: ثبت واریزی و «تخصیص» آن به قسط مربوطه.</li>
+        <li><b>بدهکاران</b>: فهرست اعضایی که مانده بدهی دارند، به‌ترتیب بیشترین بدهی — برای پیگیری سریع.</li>
+        <li><b>کارت حساب هر عضو</b>: با کلیک روی نام عضو در «بدهکاران» باز می‌شود؛ مانده تجمعی (کاردکس) را نشان می‌دهد و می‌توانید سند دستی بدهکار/بستانکار (جریمه دیرکرد، تخفیف) هم ثبت کنید.</li>
+        <li>هیچ سندی حذف نمی‌شود — فقط با ثبت دلیل «ابطال» می‌گردد.</li>
+      </ul>
+      <a class="help-link" href="/dashboard/accounting">رفتن به اسناد واریز ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>گزارش‌ساز</summary>
+    <div class="help-item-body">
+      خروجی اکسل سفارشی از داده‌های مالی — فیلدها و فیلترهای دلخواه را انتخاب کنید.
+      <a class="help-link" href="/dashboard/reports">رفتن به گزارش‌ساز ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>اعلان‌ها</summary>
+    <div class="help-item-body">
+      ارسال اعلان داخل‌پنلی به اعضا (مثلاً یادآوری قسط).
+      <a class="help-link" href="/dashboard/notifications">رفتن به اعلان‌ها ←</a>
+    </div>
+  </details>
+</div>
+
+{% else %}
+
+<div class="help-group">
+  <div class="help-group-title">پنل من</div>
+
+  <details class="help-item" open>
+    <summary>دفترچه من — اطلاعات دفترچه‌ام کجاست؟</summary>
+    <div class="help-item-body">
+      مشخصات کامل دفترچه(های) مالکیت شما (کد دفترچه، پروژه، نوع سهم، تاریخ و مبلغ قرارداد) اینجا نمایش داده می‌شود. اگر بیش از یک دفترچه دارید، می‌توانید بین آن‌ها جابه‌جا شوید.
+      <a class="help-link" href="/dashboard/booklet">رفتن به دفترچه من ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>اقساط من — چطور فیش واریزی بفرستم؟</summary>
+    <div class="help-item-body">
+      <ol>
+        <li>لیست اقساط شما با وضعیت (پرداخت‌شده/در انتظار/معوق) نمایش داده می‌شود.</li>
+        <li>برای هر قسط پرداخت‌نشده، فیش واریز را انتخاب و «ارسال فیش» کنید.</li>
+        <li>مدیریت فیش را بررسی و تأیید می‌کند؛ وضعیت قسط به‌روز می‌شود.</li>
+        <li>در بالای صفحه خلاصه «کارت حساب» شما (کل بدهی، پرداخت‌شده، مانده) هم قابل مشاهده و چاپ است.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/my-payments">رفتن به اقساط من ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>نقل و انتقال — چطور دفترچه‌ام را به شخص دیگری منتقل کنم؟</summary>
+    <div class="help-item-body">
+      <ol>
+        <li>«درخواست جدید» بزنید، مشخصات مالک جدید و مدارک لازم (کارت ملی، فرم صنا و...) را بارگذاری کنید.</li>
+        <li>پس از تأیید اولیه مدیریت، مدارک را طبق آدرس اعلام‌شده حضوری تحویل دهید.</li>
+        <li>وضعیت درخواست خود را همین‌جا پیگیری کنید.</li>
+      </ol>
+      <a class="help-link" href="/dashboard/requests">رفتن به درخواست‌های من ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>اطلاعیه‌ها و اعلان‌ها</summary>
+    <div class="help-item-body">
+      اخبار و اطلاعیه‌های تعاونی در «اطلاعیه‌ها»، و یادآوری‌های شخصی (مثل یادآوری قسط) در «اعلان‌ها» (زنگوله بالای صفحه) نمایش داده می‌شود.
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>ربات بله — چه کاربردی دارد؟</summary>
+    <div class="help-item-body">
+      با وصل‌کردن حساب بله خود، اعلان‌ها و کد یک‌بارمصرف بازیابی رمز عبور را در بله هم دریافت می‌کنید.
+      <a class="help-link" href="/dashboard/bale">رفتن به ربات بله ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>تیکت‌ها — چطور از پشتیبانی کمک بگیرم؟</summary>
+    <div class="help-item-body">
+      اگر سؤال یا مشکلی دارید، یک تیکت جدید ثبت کنید و منتظر پاسخ پشتیبانی بمانید — پاسخ‌ها همین‌جا نمایش داده می‌شود.
+      <a class="help-link" href="/dashboard/tickets">رفتن به تیکت‌ها ←</a>
+    </div>
+  </details>
+
+  <details class="help-item">
+    <summary>فرم‌ها — کجا فرم‌های مخصوص اعضا را پر کنم؟</summary>
+    <div class="help-item-body">
+      اگر مدیریت یک فرم (مثل نظرسنجی یا درخواست خاص) برای اعضا تعریف کرده باشد — چه عمومی چه مخصوص اعضا — از این‌جا در دسترس شماست.
+      <a class="help-link" href="/dashboard/forms/mine">رفتن به فرم‌ها ←</a>
+    </div>
+  </details>
+</div>
+
+{% endif %}
+
+<div id="helpNoResult" class="empty" style="display:none;padding:30px">موردی با این جستجو پیدا نشد</div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function filterHelp(){
+  var q = document.getElementById('helpSearch').value.trim().toLowerCase();
+  var anyVisible = false;
+  document.querySelectorAll('.help-item').forEach(function(item){
+    var text = item.textContent.toLowerCase();
+    var match = !q || text.indexOf(q) > -1;
+    item.style.display = match ? '' : 'none';
+    if (match) { anyVisible = true; if (q) item.open = true; }
+  });
+  document.querySelectorAll('.help-group').forEach(function(g){
+    var visibleItems = g.querySelectorAll('.help-item:not([style*="display: none"])');
+    g.style.display = visibleItems.length ? '' : 'none';
+  });
+  document.getElementById('helpNoResult').style.display = anyVisible ? 'none' : '';
+}
+</script>
+{% endblock %}

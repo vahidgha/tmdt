@@ -1,0 +1,712 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">اعضا و دفترچه‌ها</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a href="/api/members/template" class="btn btn-ghost" download>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      دانلود تمپلیت اکسل
+    </a>
+    <button class="btn btn-ghost" onclick="modal.open('importModal')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      ورود از اکسل
+    </button>
+    <button class="btn btn-gold" id="openAddMemberModalBtn">+ عضو جدید</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input class="input" id="search" placeholder="جستجو نام، کد ملی، موبایل…" oninput="searchChanged()" style="flex:1;min-width:180px">
+    <select class="input" id="projectFilter" onchange="goPage(1)" style="max-width:220px;flex:1">
+      <option value="">همه پروژه‌ها</option>
+    </select>
+  </div>
+  <div class="tbl-scroll-hint">برای مشاهده همه ستون‌ها، جدول را بکشید</div>
+  <div class="tbl-wrap">
+    <table class="tbl" id="tbl">
+      <thead><tr>
+        <th>نام</th><th>نام خانوادگی</th><th>کد ملی</th><th>جنسیت</th><th>موبایل</th>
+        <th>دفترچه‌ها</th><th>وضعیت</th><th>عملیات</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px;border-top:1px solid var(--border);flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)">
+      نمایش
+      <select class="input" id="perPageSel" onchange="perPageChanged()" style="width:auto;padding:4px 8px;font-size:12.5px">
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="30">30</option>
+        <option value="40">40</option>
+        <option value="50" selected>50</option>
+      </select>
+      در صفحه
+    </div>
+    <div id="pgBar" style="display:flex;align-items:center;justify-content:center;gap:8px"></div>
+  </div>
+</div>
+
+<!-- Modal: عضو جدید -->
+<div class="modal" id="addModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title">ثبت عضو جدید</span><button class="modal-x" onclick="modal.close('addModal')">×</button></div>
+    <div class="modal-body">
+      <div id="addErr" class="alert alert-bad" style="display:none"></div>
+      <div class="grid-2">
+        <div class="field"><label>نام *</label><input class="input" id="mFn" placeholder="نام"></div>
+        <div class="field"><label>نام خانوادگی *</label><input class="input" id="mLn" placeholder="نام خانوادگی"></div>
+        <div class="field"><label>جنسیت *</label>
+          <select class="input" id="mGender"><option value="">— انتخاب —</option><option value="مرد">مرد</option><option value="زن">زن</option></select>
+        </div>
+        <div class="field"><label>کد ملی *</label><input class="input mono" id="mNat" maxlength="10"></div>
+        <div class="field"><label>شماره شناسنامه</label><input class="input mono" id="mIdNum"></div>
+        <div class="field"><label>نام پدر</label><input class="input" id="mFather"></div>
+        <div class="field"><label>تاریخ تولد</label><input class="input" id="mBirth" placeholder="۱۳۶۰/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>موبایل *</label><input class="input" id="mPhone"></div>
+        <div class="field"><label>تلفن ضروری</label><input class="input" id="mEmergency"></div>
+        <div class="field"><label>تلفن منزل</label><input class="input" id="mLandline"></div>
+        <div class="field span-2"><label>آدرس</label><input class="input" id="mAddr"></div>
+        <div class="field"><label>کد پستی</label><input class="input mono" id="mPostal"></div>
+        <div class="field"><label>نام کاربری *</label><input class="input mono" id="mUser"></div>
+        <div class="field"><label>رمز عبور *</label>
+          <div class="row-gap"><input class="input mono" id="mPass"><button class="btn btn-ghost btn-sm" onclick="genPass()">تولید</button></div>
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">اضافه کردن دفترچه (اختیاری — بعداً هم می‌توانید اضافه کنید)</p>
+      <div class="grid-2">
+        <div class="field"><label>پروژه</label>
+          <select class="input" id="mProj" autocomplete="off"><option value="">— بدون دفترچه —</option></select>
+        </div>
+        <div class="field"><label>میزان سهم</label>
+          <select class="input" id="mShare" autocomplete="off"><option value="full">تمام‌سهم</option><option value="half">نیم‌سهم</option></select>
+        </div>
+        <div class="field"><label>شماره دفترچه</label><input class="input mono" id="mBookletNum" placeholder="شماره دفترچه دستی" autocomplete="off"></div>
+        <div class="field"><label>شماره قرارداد</label><input class="input mono" id="mContract" autocomplete="off"></div>
+        <div class="field"><label>تاریخ قرارداد</label><input class="input" id="mContractDate" placeholder="۱۴۰۴/۰۱/۰۱" data-jdp autocomplete="off"></div>
+        <div class="field"><label>مبلغ قرارداد (ریال)</label><input class="input" type="text" id="mContractAmt" data-amount inputmode="numeric" autocomplete="off"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="addMember(this)">ثبت عضو</button>
+      <button class="btn btn-ghost" onclick="modal.close('addModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: دفترچه جدید برای عضو موجود -->
+<div class="modal" id="bookletModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title" id="bModalTitle">دفترچه جدید</span><button class="modal-x" onclick="modal.close('bookletModal')">×</button></div>
+    <div class="modal-body">
+      <div id="bErr" class="alert alert-bad" style="display:none"></div>
+      <input type="hidden" id="bOwnerId">
+      <div class="grid-2">
+        <div class="field"><label>پروژه *</label>
+          <select class="input" id="bProj"></select>
+        </div>
+        <div class="field"><label>نوع سهم *</label>
+          <select class="input" id="bShare"><option value="full">تمام‌سهم</option><option value="half">نیم‌سهم</option></select>
+        </div>
+        <div class="field"><label>شماره دفترچه</label><input class="input mono" id="bBookletNum" placeholder="شماره دفترچه دستی"></div>
+        <div class="field"><label>شماره قرارداد</label><input class="input mono" id="bContract"></div>
+        <div class="field"><label>تاریخ قرارداد</label><input class="input" id="bContractDate" placeholder="۱۴۰۴/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>مبلغ قرارداد (ریال)</label><input class="input" type="text" id="bContractAmt" data-amount inputmode="numeric"></div>
+        <div class="field"><label>توضیحات</label><input class="input" id="bNotes"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="addBooklet()">ثبت دفترچه</button>
+      <button class="btn btn-ghost" onclick="modal.close('bookletModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Modal: ورود از اکسل -->
+<div class="modal" id="importModal">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-head">
+      <span class="modal-title">ورود انبوه اعضا از اکسل</span>
+      <button class="modal-x" onclick="modal.close('importModal')">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- راهنما -->
+      <div style="background:rgba(200,164,86,.08);border:1px solid rgba(200,164,86,.25);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:2">
+        <div style="font-weight:700;color:var(--gold);margin-bottom:6px">راهنمای سریع</div>
+        <ol style="margin:0;padding-right:20px;color:var(--muted)">
+          <li>فایل تمپلیت اکسل را دانلود کنید.</li>
+          <li>اطلاعات اعضا را از ردیف ۵ به بعد وارد کنید (ردیف ۴ نمونه است — حذف کنید).</li>
+          <li>ستون‌های دارای <b style="color:var(--gold)">*</b> اجباری هستند.</li>
+          <li>فایل تکمیل‌شده را اینجا آپلود کنید.</li>
+        </ol>
+      </div>
+
+      <div id="importErr" class="alert alert-bad" style="display:none"></div>
+      <div id="importResult" style="display:none"></div>
+
+      <div class="field">
+        <label>فایل اکسل (xlsx)</label>
+        <input type="file" id="importFile" accept=".xlsx,.xls" class="input" style="padding:8px">
+      </div>
+
+      <div id="importProgress" style="display:none;margin-top:8px">
+        <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden">
+          <div id="importBar" style="height:100%;background:var(--gold);width:0%;transition:width .4s"></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;text-align:center">در حال پردازش…</div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="doImport()" id="importBtn">آپلود و ورود</button>
+      <button class="btn btn-ghost" onclick="modal.close('importModal')">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: نقل و انتقال دفترچه -->
+<div class="modal" id="transferModal">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-head"><span class="modal-title" id="transferTitle">درخواست نقل و انتقال</span><button class="modal-x" onclick="modal.close('transferModal')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="trBookletId">
+      <div id="transferErr" class="alert alert-bad" style="display:none"></div>
+      <div class="grid-2">
+        <div class="field"><label>نام مالک جدید *</label><input class="input" id="trFn" placeholder="نام"></div>
+        <div class="field"><label>نام خانوادگی *</label><input class="input" id="trLn" placeholder="نام خانوادگی"></div>
+        <div class="field"><label>کد ملی *</label><input class="input mono" id="trNat" maxlength="10"></div>
+        <div class="field"><label>موبایل *</label><input class="input" id="trPh"></div>
+        <div class="field span-2"><label>توضیحات</label><input class="input" id="trNote" placeholder="اختیاری"></div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">بارگذاری مدارک</p>
+      <div class="grid-2">
+        <div class="field"><label>فیش واریزی</label><input type="file" class="input" id="trReceipt" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>قول‌نامه / توافق‌نامه</label><input type="file" class="input" id="trAgreement" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>تصویر شناسنامه</label><input type="file" class="input" id="trSana" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>تصویر شناسنامه (صفحه اول)</label><input type="file" class="input" id="trIdFirst" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>کارت ملی (جلو)</label><input type="file" class="input" id="trNatFront" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field"><label>کارت ملی (پشت)</label><input type="file" class="input" id="trNatBack" accept="image/*,.pdf" style="padding:6px"></div>
+        <div class="field span-2"><label>تصویر اضافی (اختیاری)</label><input type="file" class="input" id="trExtra" accept="image/*,.pdf" style="padding:6px"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="submitTransfer()">ثبت درخواست</button>
+      <button class="btn btn-ghost" onclick="modal.close('transferModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ویرایش عضو -->
+<div class="modal" id="editModal">
+  <div class="modal-box">
+    <div class="modal-head"><span class="modal-title">ویرایش عضو</span><button class="modal-x" onclick="modal.close('editModal')">×</button></div>
+    <div class="modal-body">
+      <div id="editErr" class="alert alert-bad" style="display:none"></div>
+      <div class="grid-2">
+        <div class="field"><label>نام *</label><input class="input" id="eFn"></div>
+        <div class="field"><label>نام خانوادگی *</label><input class="input" id="eLn"></div>
+        <div class="field"><label>جنسیت</label><select class="input" id="eGender"><option value="">— انتخاب —</option><option value="مرد">مرد</option><option value="زن">زن</option></select></div>
+        <div class="field"><label>کد ملی</label><input class="input mono" id="eNat" maxlength="10"></div>
+        <div class="field"><label>شماره شناسنامه</label><input class="input mono" id="eIdNum"></div>
+        <div class="field"><label>نام پدر</label><input class="input" id="eFather"></div>
+        <div class="field"><label>تاریخ تولد</label><input class="input" id="eBirth" placeholder="۱۳۶۰/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>موبایل</label><input class="input" id="ePhone"></div>
+        <div class="field"><label>تلفن ضروری</label><input class="input" id="eEmergency"></div>
+        <div class="field"><label>تلفن منزل</label><input class="input" id="eLandline"></div>
+        <div class="field span-2"><label>آدرس</label><input class="input" id="eAddr"></div>
+        <div class="field"><label>کد پستی</label><input class="input mono" id="ePostal"></div>
+        <div class="field"><label>شغل</label><input class="input" id="eOccupation"></div>
+        <div class="field"><label>ایمیل</label><input class="input" id="eEmail"></div>
+        <div class="field"><label>نام کاربری *</label><input class="input mono" id="eUser"></div>
+        <div class="field"><label>نام بانک</label><input class="input" id="eBank"></div>
+        <div class="field"><label>شماره حساب</label><input class="input mono" id="eAccount"></div>
+        <div class="field"><label>شبا</label><input class="input mono" id="eIban"></div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
+        <label style="font-weight:700;font-size:13px">تغییر رمز عبور <span style="font-size:11px;color:var(--muted)">(خالی بگذارید تا تغییر نکند)</span></label>
+        <div class="row-gap" style="margin-top:6px">
+          <input class="input mono" id="eNewPass" placeholder="رمز عبور جدید" autocomplete="new-password">
+          <button class="btn btn-ghost btn-sm" type="button" onclick="document.getElementById('eNewPass').value=Math.floor(1000+Math.random()*9000)">تولید</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="saveEdit(this)">ذخیره تغییرات</button>
+      <button class="btn btn-ghost" onclick="modal.close('editModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: آرشیو اسناد عضو -->
+<div class="modal" id="docsModal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><span class="modal-title" id="docsTitle">آرشیو اسناد</span><button class="modal-x" onclick="modal.close('docsModal')">×</button></div>
+    <div class="modal-body">
+      <div class="card card-p" style="margin-bottom:14px;background:var(--bg)">
+        <div class="grid-2">
+          <div class="field"><label>عنوان سند *</label><input class="input" id="docTitle" placeholder="مثال: قرارداد امضاشده"></div>
+          <div class="field"><label>نوع سند</label>
+            <select class="input" id="docType">
+              <option value="contract">قرارداد</option>
+              <option value="identity">مدارک هویتی</option>
+              <option value="financial">مالی</option>
+              <option value="other" selected>سایر</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>فایل * <span style="font-size:11px;color:var(--muted)">(تصویر یا PDF — حداکثر ۲۰MB)</span></label><input type="file" class="input" id="docFile" accept="image/*,.pdf"></div>
+        <div class="field"><label>یادداشت (اختیاری)</label><input class="input" id="docNote"></div>
+        <button class="btn btn-navy btn-sm" onclick="uploadDoc(this)">آپلود سند</button>
+      </div>
+      <div id="docsList"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="modal.close('docsModal')">بستن</button></div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+/* escape برای متن/attribute HTML معمولی */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+/* escape برای مقداری که به‌عنوان آرگومان رشته‌ای (تک‌کوتیشن) داخل onclick="fn('...')" جاسازی می‌شود —
+   با & (\' برای پایان‌ندادن زودهنگام رشته JS، \" با entity برای عبور امن از attribute دوکوتیشن HTML). */
+function escAttr(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'\\n').replace(/\r/g,'');
+}
+/* آیکون‌های SVG یکدست برای دکمه‌های عملیات ردیف (به‌جای ایموجی) */
+var ICON_EDIT   = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+var ICON_CARD   = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>';
+var ICON_FOLDER = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+var ICON_FILE   = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>';
+
+var curPage = 1;
+var searchTimer = null;
+function searchChanged() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function(){ curPage = 1; load(); }, 400);
+}
+function goPage(p) { curPage = p; load(); }
+function perPageChanged() { curPage = 1; load(); }
+function renderPager(d) {
+  var bar = document.getElementById('pgBar');
+  if (d.pages <= 1) { bar.innerHTML = '<span style="font-size:12px;color:var(--muted)">' + d.total + ' عضو</span>'; return; }
+  var h = '<button class="btn-outline btn-sm" ' + (d.page<=1?'disabled':'') + ' onclick="goPage(' + (d.page-1) + ')">قبلی</button>';
+  h += '<span style="font-size:13px">صفحه ' + d.page + ' از ' + d.pages + ' <span style="color:var(--muted)">(' + d.total + ' عضو)</span></span>';
+  h += '<button class="btn-outline btn-sm" ' + (d.page>=d.pages?'disabled':'') + ' onclick="goPage(' + (d.page+1) + ')">بعدی</button>';
+  bar.innerHTML = h;
+}
+function skeletonRows(cols, n) {
+  var cell = '<td class="tbl-skel-cell"><div class="skeleton tbl-skel-bar"></div></td>';
+  return Array.from({length: n || 6}).map(function(){
+    return '<tr>' + cell.repeat(cols) + '</tr>';
+  }).join('');
+}
+function load() {
+  var pid = document.getElementById('projectFilter').value;
+  var q   = document.getElementById('search').value.trim();
+  var per = document.getElementById('perPageSel').value;
+  var url = '/api/members?page=' + curPage + '&per_page=' + per
+          + (pid ? '&project_id=' + pid : '')
+          + (q ? '&search=' + encodeURIComponent(q) : '');
+  document.getElementById('tbody').innerHTML = skeletonRows(8);
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    renderPager(d);
+    var tb = document.getElementById('tbody');
+    if (!d.members.length) {
+      tb.innerHTML = '<tr><td colspan="8"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>عضوی یافت نشد</div></td></tr>';
+      return;
+    }
+    tb.innerHTML = d.members.map(function(m) {
+      var booklets = m.booklets.map(function(b) {
+        var label = (b.serial ? '#'+b.serial+' ' : '') + (b.booklet_number ? esc(b.booklet_number)+' · ' : '') + (b.share_type==='full'?'تمام':'نیم') + ' · ' + esc(b.project_name||'');
+        return '<span class="badge ' + (b.share_type==='full'?'b-ok':'b-warn') + '" style="margin-left:4px;cursor:pointer" onclick="printContract(' + b.id + ')" title="چاپ قرارداد">' +
+          label + '</span>' +
+          '<button class="btn-outline" style="margin-left:4px;font-size:11px" onclick="openTransferModal(' + b.id + ',\'' + escAttr(b.code) + '\')">انتقال</button>' +
+          '<button class="btn-outline bad" style="margin-left:2px;font-size:10px;padding:1px 6px" onclick="delBooklet(' + b.id + ', this)" title="حذف دفترچه">×</button>';
+      }).join('');
+      var fullName = escAttr(m.first_name+' '+m.last_name);
+      return '<tr>' +
+        '<td>' + esc(m.first_name) + '</td>' +
+        '<td><b>' + esc(m.last_name) + '</b></td>' +
+        '<td class="mono">' + esc(m.national_code||'—') + '</td>' +
+        '<td>' + esc(m.gender||'—') + '</td>' +
+        '<td>' + esc(m.phone||'—') + '</td>' +
+        '<td>' + booklets +
+          '<button class="btn-outline" style="margin-right:4px" onclick="openBookletModal(' + m.id + ',\'' + fullName + '\')">+ دفترچه</button>' +
+        '</td>' +
+        '<td><span class="badge ' + (m.active?'b-ok':'b-off') + '">' + (m.active?'فعال':'غیرفعال') + '</span></td>' +
+        '<td style="white-space:nowrap">' +
+          '<button class="btn-outline ' + (m.active?'bad':'ok') + '" onclick="toggle(' + m.id + ')">' + (m.active?'غیرفعال':'فعال') + '</button> ' +
+          '<button class="btn-outline" onclick="openEdit(' + m.id + ')" title="ویرایش عضو" style="font-size:11px">' + ICON_EDIT + ' ویرایش</button> ' +
+          '<a class="btn-outline" href="/dashboard/accounting/statement/' + m.id + '" title="کارت حساب" style="font-size:11px">' + ICON_CARD + ' حساب</a> ' +
+          '<button class="btn-outline" onclick="openDocs(' + m.id + ',\'' + fullName + '\')" title="آرشیو اسناد" style="font-size:11px">' + ICON_FOLDER + ' اسناد</button> ' +
+          '<button class="btn-outline bad" onclick="delMember(' + m.id + ',\'' + fullName + '\', this)" title="حذف عضو" style="font-size:11px">حذف</button>' +
+        '</td>' +
+        '</tr>';
+    }).join('');
+  });
+}
+var editUid = null;
+var EDIT_MAP = {eFn:'first_name',eLn:'last_name',eGender:'gender',eNat:'national_code',
+  eIdNum:'id_number',eFather:'father_name',eBirth:'birth_date',ePhone:'phone',
+  eEmergency:'emergency_phone',eLandline:'landline',eAddr:'address',ePostal:'postal_code',
+  eOccupation:'occupation',eEmail:'email',eUser:'username',eBank:'bank_name',
+  eAccount:'account_number',eIban:'iban'};
+function openEdit(uid){
+  editUid = uid;
+  document.getElementById('editErr').style.display='none';
+  document.getElementById('eNewPass').value='';
+  fetch('/api/members/'+uid).then(function(r){return r.json();}).then(function(d){
+    if(!d.member){toast('عضو یافت نشد','warn');return;}
+    var m=d.member;
+    Object.keys(EDIT_MAP).forEach(function(id){document.getElementById(id).value=m[EDIT_MAP[id]]||'';});
+    modal.open('editModal');
+  });
+}
+function saveEdit(btn){
+  var err=document.getElementById('editErr');err.style.display='none';
+  var body={};Object.keys(EDIT_MAP).forEach(function(id){body[EDIT_MAP[id]]=document.getElementById(id).value.trim();});
+  if(!body.first_name||!body.last_name||!body.username){err.textContent='نام، نام خانوادگی و نام کاربری الزامی است.';err.style.display='';return;}
+  btnLoading(btn,true);
+  fetch('/api/members/'+editUid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){
+      if(!x.ok){btnLoading(btn,false);err.textContent=x.d.error||'خطا در ذخیره';err.style.display='';return;}
+      var newPass=document.getElementById('eNewPass').value.trim();
+      if(newPass){
+        return fetch('/api/members/'+editUid+'/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:newPass})})
+          .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+          .then(function(y){btnLoading(btn,false);if(!y.ok){err.textContent=y.d.error||'اطلاعات ذخیره شد اما تغییر رمز ناموفق بود';err.style.display='';return;}modal.close('editModal');toast('عضو ویرایش شد و رمز تغییر کرد');load();});
+      }
+      btnLoading(btn,false);modal.close('editModal');toast('اطلاعات عضو ویرایش شد');load();
+    })
+    .catch(function(){btnLoading(btn,false);err.textContent='خطا در اتصال به سرور';err.style.display='';});
+}
+
+var docsUid = null;
+var docTypeLabel = {contract:'قرارداد', identity:'مدارک هویتی', financial:'مالی', other:'سایر'};
+function openDocs(uid, name) {
+  docsUid = uid;
+  document.getElementById('docsTitle').textContent = 'آرشیو اسناد — ' + name;
+  document.getElementById('docTitle').value = '';
+  document.getElementById('docNote').value = '';
+  document.getElementById('docFile').value = '';
+  loadDocs();
+  modal.open('docsModal');
+}
+function loadDocs() {
+  fetch('/api/members/' + docsUid + '/documents').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('docsList');
+    if (!d.documents || !d.documents.length) {
+      el.innerHTML = '<div class="empty" style="padding:16px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>سندی ثبت نشده</div>';
+      return;
+    }
+    window._memberDocImages = d.documents.filter(function(doc){return /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_path);})
+      .map(function(doc){return {src:'/uploads/'+doc.file_path, label:doc.title||docTypeLabel[doc.doc_type]||''};});
+    var imgIdx = 0;
+    el.innerHTML = d.documents.map(function(doc){
+      var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_path);
+      var thisIdx = isImg ? imgIdx++ : -1;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px">' +
+        (isImg
+          ? '<a href="#" onclick="imgViewer.open(window._memberDocImages,' + thisIdx + ');return false;" style="flex-shrink:0">' +
+            '<img src="/uploads/' + doc.file_path + '" style="width:52px;height:52px;object-fit:cover;border-radius:8px;cursor:zoom-in">' +
+            '</a>'
+          : '<a href="/uploads/' + doc.file_path + '" target="_blank" style="flex-shrink:0">' +
+            '<span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:var(--bg-alt);border-radius:8px;color:var(--muted)">' + ICON_FILE + '</span>' +
+            '</a>') +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:13px">' + esc(doc.title) + '</div>' +
+          '<div style="font-size:11px;color:var(--muted)">' + esc(docTypeLabel[doc.doc_type]||doc.doc_type) + ' — ' + new Date(doc.created_at).toLocaleDateString('fa-IR') +
+          (doc.note ? ' · ' + esc(doc.note) : '') + '</div>' +
+        '</div>' +
+        '<button class="btn-outline bad btn-sm" onclick="delDoc(' + doc.id + ', this)">حذف</button>' +
+        '</div>';
+    }).join('');
+  });
+}
+function uploadDoc(btn) {
+  var title = document.getElementById('docTitle').value.trim();
+  var file  = document.getElementById('docFile').files[0];
+  if (!title) { toast('عنوان سند را وارد کنید', 'warn'); return; }
+  if (!file)  { toast('فایل را انتخاب کنید', 'warn'); return; }
+  var fd = new FormData();
+  fd.append('title', title);
+  fd.append('doc_type', document.getElementById('docType').value);
+  fd.append('note', document.getElementById('docNote').value.trim());
+  fd.append('file', file);
+  btnLoading(btn, true);
+  fetch('/api/members/' + docsUid + '/documents', {method:'POST', body: fd})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok, d:d};});})
+    .then(function(x){
+      btnLoading(btn, false);
+      if (x.ok) {
+        toast('سند آپلود شد');
+        document.getElementById('docTitle').value = '';
+        document.getElementById('docNote').value = '';
+        document.getElementById('docFile').value = '';
+        loadDocs();
+      } else toast(x.d.error || 'خطا در آپلود', 'warn');
+    })
+    .catch(function(){ btnLoading(btn, false); toast('خطا در اتصال به سرور', 'warn'); });
+}
+function delDoc(did, btn) {
+  if (!confirm('این سند حذف شود؟')) return;
+  fetch('/api/members/' + docsUid + '/documents/' + did, {method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) { toast('سند حذف شد'); loadDocs(); }
+      else toast(d.error || 'خطا', 'warn');
+    });
+}
+function genPass() { document.getElementById('mPass').value = Math.floor(1000+Math.random()*9000); }
+function addMember(btn) {
+  var err = document.getElementById('addErr'); err.style.display='none';
+  var body = {
+    first_name: document.getElementById('mFn').value.trim(),
+    last_name:  document.getElementById('mLn').value.trim(),
+    gender: document.getElementById('mGender').value,
+    national_code: document.getElementById('mNat').value.trim(),
+    id_number: document.getElementById('mIdNum').value.trim(),
+    father_name: document.getElementById('mFather').value.trim(),
+    birth_date: document.getElementById('mBirth').value.trim(),
+    phone: document.getElementById('mPhone').value.trim(),
+    emergency_phone: document.getElementById('mEmergency').value.trim(),
+    landline: document.getElementById('mLandline').value.trim(),
+    address: document.getElementById('mAddr').value.trim(),
+    postal_code: document.getElementById('mPostal').value.trim(),
+    username: document.getElementById('mUser').value.trim(),
+    password: document.getElementById('mPass').value.trim(),
+    project_id: document.getElementById('mProj').value || null,
+    share_type: document.getElementById('mShare').value,
+    booklet_number: document.getElementById('mBookletNum').value.trim(),
+    contract_no: document.getElementById('mContract').value.trim(),
+    contract_date: document.getElementById('mContractDate').value.trim(),
+    contract_amount: getRawAmt(document.getElementById('mContractAmt'))
+  };
+  btnLoading(btn, true);
+  fetch('/api/members', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(function(r){ return r.json().then(function(d){ return {r:r, d:d}; }); })
+    .then(function(x) {
+      btnLoading(btn, false);
+      if (!x.r.ok) { err.textContent = x.d.error || 'خطا در ثبت عضو'; err.style.display=''; return; }
+      modal.close('addModal'); toast('عضو ثبت شد'); load();
+    })
+    .catch(function() {
+      btnLoading(btn, false);
+      err.textContent = 'خطا در اتصال به سرور'; err.style.display='';
+    });
+}
+function openBookletModal(uid, name) {
+  document.getElementById('bOwnerId').value = uid;
+  document.getElementById('bModalTitle').textContent = 'دفترچه جدید — ' + name;
+  document.getElementById('bookletModal').classList.add('open');
+}
+function addBooklet() {
+  var errEl = document.getElementById('bErr'); errEl.style.display='none';
+  var projId = document.getElementById('bProj').value;
+  if (!projId) { errEl.textContent='انتخاب پروژه الزامی است.'; errEl.style.display=''; return; }
+  var body = {
+    owner_id: document.getElementById('bOwnerId').value,
+    project_id: projId,
+    share_type: document.getElementById('bShare').value,
+    booklet_number: document.getElementById('bBookletNum').value.trim(),
+    contract_no: document.getElementById('bContract').value.trim(),
+    contract_date: document.getElementById('bContractDate').value.trim(),
+    contract_amount: getRawAmt(document.getElementById('bContractAmt')),
+    notes: document.getElementById('bNotes').value.trim()
+  };
+  fetch('/api/booklets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(x){
+      if(!x.ok){errEl.textContent=x.d.error||'خطا در ثبت دفترچه';errEl.style.display='';return;}
+      modal.close('bookletModal'); toast('دفترچه ثبت شد'); load();
+    })
+    .catch(function(){errEl.textContent='خطا در ارتباط با سرور';errEl.style.display='';});
+}
+function toggle(id){fetch('/api/members/'+id+'/toggle',{method:'POST'}).then(function(){load();});}
+function delMember(id, name, btn) {
+  confirmAction('عضو «' + name + '» و تمام دفترچه‌هایش حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    btnLoading(btn, true);
+    fetch('/api/members/'+id, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+      if (d.ok) { toast('عضو حذف شد'); load(); }
+      else { btnLoading(btn, false); toast(d.error || 'خطا'); }
+    });
+  });
+}
+function delBooklet(id, btn) {
+  confirmAction('این دفترچه حذف شود؟').then(function(ok) {
+    if (!ok) return;
+    btnLoading(btn, true);
+    fetch('/api/booklets/'+id, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+      if (d.ok) { toast('دفترچه حذف شد'); load(); }
+      else { btnLoading(btn, false); toast(d.error || 'خطا'); }
+    });
+  });
+}
+function printContract(bid){window.open('/dashboard/contract/'+bid,'_blank');}
+function loadProjects(){
+  fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+    ['mProj','bProj'].forEach(function(elId){
+      var sel=document.getElementById(elId); if(!sel)return;
+      var empty=elId==='mProj'?'<option value="">— بدون دفترچه —</option>':'<option value="">— انتخاب پروژه —</option>';
+      sel.innerHTML=empty+d.projects.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');
+    });
+    var pf=document.getElementById('projectFilter');
+    pf.innerHTML='<option value="">همه پروژه‌ها</option>'+d.projects.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');
+  });
+}
+function openTransferModal(bookletId, bookletCode){
+  document.getElementById('trBookletId').value = bookletId;
+  document.getElementById('transferTitle').textContent = 'درخواست نقل و انتقال — ' + bookletCode;
+  ['trFn','trLn','trNat','trPh','trNote'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['trReceipt','trAgreement','trSana','trIdFirst','trNatFront','trNatBack','trExtra'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('transferErr').style.display='none';
+  modal.open('transferModal');
+}
+function submitTransfer(){
+  var errEl=document.getElementById('transferErr'); errEl.style.display='none';
+  var fileFields={receipt:'trReceipt',agreement:'trAgreement',sana_form:'trSana',id_first_page:'trIdFirst',national_front:'trNatFront',national_back:'trNatBack',extra_photo:'trExtra'};
+  var files={};
+  Object.keys(fileFields).forEach(function(k){ var f=document.getElementById(fileFields[k]).files[0]; if(f) files[k]=f; });
+  // فشرده‌سازی تصاویر به‌صورت موازی قبل از ارسال
+  var keys=Object.keys(files);
+  var pending=keys.length;
+  function send(compressedFiles){
+    var fd=new FormData();
+    fd.append('booklet_id',  document.getElementById('trBookletId').value);
+    fd.append('new_owner_first_name',  document.getElementById('trFn').value.trim());
+    fd.append('new_owner_last_name',   document.getElementById('trLn').value.trim());
+    fd.append('new_owner_national_code', document.getElementById('trNat').value.trim());
+    fd.append('new_owner_phone',       document.getElementById('trPh').value.trim());
+    fd.append('note',                  document.getElementById('trNote').value.trim());
+    Object.keys(compressedFiles).forEach(function(k){ fd.append(k, compressedFiles[k]); });
+    fetch('/api/requests',{method:'POST',body:fd}).then(function(r){return r.json().then(function(d){return {r:r,d:d};});}).then(function(x){
+      if(!x.r.ok){errEl.textContent=x.d.error||'خطا';errEl.style.display='';return;}
+      modal.close('transferModal');toast('درخواست انتقال ثبت شد');
+    }).catch(function(){errEl.textContent='خطا در ارتباط با سرور';errEl.style.display='';});
+  }
+  if (!pending) { send({}); return; }
+  var compressed={};
+  keys.forEach(function(k){
+    compressImage(files[k], 1600, 1600, 0.80, function(f){
+      compressed[k]=f;
+      pending--;
+      if(pending===0) send(compressed);
+    });
+  });
+}
+loadProjects(); load();
+
+document.getElementById('openAddMemberModalBtn').onclick = function(){
+  document.getElementById('addModal').querySelectorAll('input,select,textarea').forEach(function(el){
+    el.value = '';
+  });
+  modal.open('addModal');
+};
+
+function doImport() {
+  var fileEl = document.getElementById('importFile');
+  var errEl  = document.getElementById('importErr');
+  var resEl  = document.getElementById('importResult');
+  var prog   = document.getElementById('importProgress');
+  var bar    = document.getElementById('importBar');
+  var btn    = document.getElementById('importBtn');
+  errEl.style.display = 'none';
+  resEl.style.display = 'none';
+
+  if (!fileEl.files.length) {
+    errEl.textContent = 'لطفاً یک فایل اکسل انتخاب کنید.';
+    errEl.style.display = '';
+    return;
+  }
+
+  var fd = new FormData();
+  fd.append('file', fileEl.files[0]);
+
+  btn.disabled = true;
+  prog.style.display = '';
+  bar.style.width = '30%';
+
+  fetch('/api/members/import', { method: 'POST', body: fd })
+    .then(function(r) { bar.style.width = '80%'; return r.json().then(function(d){ return {r:r,d:d}; }); })
+    .then(function(x) {
+      bar.style.width = '100%';
+      btn.disabled = false;
+      setTimeout(function(){ prog.style.display = 'none'; bar.style.width = '0%'; }, 600);
+
+      if (!x.r.ok) {
+        errEl.textContent = x.d.error;
+        errEl.style.display = '';
+        return;
+      }
+
+      var d = x.d;
+      var html = '<div style="border-radius:10px;overflow:hidden;font-size:13px">';
+
+      // خلاصه
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">';
+      html += _statBox('✅ ثبت شدند', d.created, 'var(--ok-c,#22c55e)');
+      html += _statBox('⚠️ رد شدند', d.skipped, '#f59e0b');
+      html += _statBox('❌ خطا', d.errors, '#ef4444');
+      html += '</div>';
+
+      // جزئیات
+      if (d.detail.created.length) {
+        html += _detailSection('ثبت‌شدگان', d.detail.created.map(function(r){
+          return r.name + ' (' + r.username + ')';
+        }), '#e8f5e9');
+      }
+      if (d.detail.skipped.length) {
+        html += _detailSection('رد شدند', d.detail.skipped.map(function(r){
+          return 'ردیف ' + r.row + ': ' + r.username + ' — ' + r.reason;
+        }), '#fff8e1');
+      }
+      if (d.detail.errors.length) {
+        html += _detailSection('خطاها', d.detail.errors.map(function(r){
+          return 'ردیف ' + r.row + ': ' + r.username + ' — ' + r.error;
+        }), '#fce4e4');
+      }
+
+      html += '</div>';
+      resEl.innerHTML = html;
+      resEl.style.display = '';
+
+      if (d.created > 0) { load(); }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      prog.style.display = 'none';
+      errEl.textContent = 'خطا در ارسال فایل. دوباره تلاش کنید.';
+      errEl.style.display = '';
+    });
+}
+
+function _statBox(label, count, color) {
+  return '<div style="text-align:center;background:var(--card-bg,#fff);border:1px solid var(--border);border-radius:8px;padding:10px 6px">' +
+    '<div style="font-size:20px;font-weight:800;color:' + color + '">' + count + '</div>' +
+    '<div style="font-size:11px;color:var(--muted)">' + label + '</div>' +
+    '</div>';
+}
+
+function _detailSection(title, items, bg) {
+  if (!items.length) return '';
+  return '<div style="background:' + bg + ';border-radius:8px;padding:10px 12px;margin-bottom:10px">' +
+    '<div style="font-weight:700;font-size:12px;margin-bottom:6px">' + title + ' (' + items.length + ')</div>' +
+    '<ul style="margin:0;padding-right:16px;font-size:12px;line-height:1.9">' +
+    items.map(function(i){ return '<li>' + i + '</li>'; }).join('') +
+    '</ul></div>';
+}
+</script>
+{% endblock %}

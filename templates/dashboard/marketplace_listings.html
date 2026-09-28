@@ -1,0 +1,98 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">آگهی‌های من</h1>
+  <a href="/dashboard/marketplace/new" class="btn btn-gold">+ ثبت آگهی جدید</a>
+</div>
+<div id="listWrap" class="stagger"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+var STATUS_LBL = {
+  draft: 'پیش‌نویس', waiting_payment: 'در انتظار پرداخت', payment_review: 'در حال بررسی پرداخت',
+  admin_review: 'در حال بررسی مدیر', published: 'منتشرشده', rejected: 'رد شده',
+  expired: 'منقضی‌شده', sold: 'فروخته‌شده', cancelled: 'لغوشده', disabled: 'غیرفعال',
+};
+var STATUS_CLS = {
+  draft: 'b-off', waiting_payment: 'b-warn', payment_review: 'b-warn',
+  admin_review: 'b-info', published: 'b-ok', rejected: 'b-bad',
+  expired: 'b-off', sold: 'b-ok', cancelled: 'b-off', disabled: 'b-off',
+};
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&lt;','<':'&lt;','>':'&gt;'}[c];}); }
+function fmt(n){ return Number(n||0).toLocaleString(); }
+
+function load(){
+  fetch('/api/marketplace/my-listings').then(function(r){return r.json();}).then(function(d){
+    var items = d.listings || [];
+    var wrap = document.getElementById('listWrap');
+    if(!items.length){
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon">🏬</div>هنوز آگهی‌ای ثبت نکرده‌اید — با دکمه بالا شروع کنید</div>';
+      return;
+    }
+    wrap.innerHTML = items.map(renderCard).join('');
+  });
+}
+
+function renderCard(l){
+  var actions = '';
+  if (l.status === 'waiting_payment') {
+    actions += '<a class="btn btn-gold btn-sm" href="/dashboard/marketplace/edit/'+l.id+'">پرداخت هزینه ثبت</a>';
+  }
+  if (['draft','admin_review','rejected','published','expired'].indexOf(l.status) > -1) {
+    actions += '<a class="btn btn-ghost btn-sm" href="/dashboard/marketplace/edit/'+l.id+'">ویرایش</a>';
+  }
+  if (l.status === 'published') {
+    actions += '<button class="btn btn-ghost btn-sm" onclick="markSold('+l.id+')">دفترچه فروخته شد</button>';
+  }
+  if (l.status === 'expired') {
+    actions += '<button class="btn btn-gold btn-sm" onclick="renew('+l.id+')">تمدید آگهی</button>';
+  }
+  if (['draft','waiting_payment','payment_review','admin_review','published'].indexOf(l.status) > -1) {
+    actions += '<button class="btn btn-ghost btn-sm" style="color:var(--bad)" onclick="cancelListing('+l.id+')">لغو آگهی</button>';
+  }
+  var rejectBox = (l.status === 'rejected' && l.reject_reason)
+    ? '<div class="alert alert-bad" style="margin-top:10px">دلیل رد: '+esc(l.reject_reason)+'</div>' : '';
+
+  return '<div class="card card-p" style="margin-bottom:14px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
+      '<div>'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+          '<b style="font-size:15px">'+esc(l.title)+'</b>'+
+          '<span class="badge '+(STATUS_CLS[l.status]||'b-off')+'">'+(STATUS_LBL[l.status]||l.status)+'</span>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--muted);font-family:monospace">'+l.code+'</div>'+
+        '<div style="font-size:13px;margin-top:8px">قیمت: <b>'+fmt(l.price)+'</b> تومان'+
+          (l.request_count ? ' &nbsp;·&nbsp; <span style="color:var(--gold)">'+l.request_count+' درخواست خرید</span>' : '')+
+        '</div>'+
+        rejectBox+
+      '</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+actions+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function markSold(id){
+  confirmAction('این آگهی به‌عنوان «فروخته‌شده» ثبت شود و از بازار عمومی حذف شود؟').then(function(ok){
+    if(!ok) return;
+    fetch('/api/marketplace/listings/'+id+'/sold', {method:'POST'}).then(function(r){
+      if(r.ok){ toast('آگهی فروخته‌شده ثبت شد'); load(); } else { toast('خطا در ثبت', 'warn'); }
+    });
+  });
+}
+function cancelListing(id){
+  confirmAction('این آگهی لغو شود؟').then(function(ok){
+    if(!ok) return;
+    fetch('/api/marketplace/listings/'+id+'/cancel', {method:'POST'}).then(function(r){
+      if(r.ok){ toast('آگهی لغو شد'); load(); } else { toast('خطا در لغو', 'warn'); }
+    });
+  });
+}
+function renew(id){
+  fetch('/api/marketplace/listings/'+id+'/renew', {method:'POST'}).then(function(r){
+    if(r.ok){ toast('آگهی تمدید شد'); load(); } else { toast('خطا در تمدید', 'warn'); }
+  });
+}
+
+load();
+</script>
+{% endblock %}

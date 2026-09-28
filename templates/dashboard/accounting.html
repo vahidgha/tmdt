@@ -1,0 +1,415 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">حسابداری تعاونی</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    {% if user.role == 'admin' %}
+    <button class="btn btn-ghost" onclick="openFinanceAccess()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      دسترسی مالی
+    </button>
+    {% endif %}
+    <button class="btn btn-ghost" onclick="openAccounts()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 6l7-4 7 4M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>
+      حساب‌ها
+    </button>
+    <button class="btn btn-navy" onclick="openNewExpense()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      سند هزینه
+    </button>
+    <button class="btn btn-gold" onclick="openNewVoucher()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      سند واریز
+    </button>
+  </div>
+</div>
+
+<!-- داشبورد -->
+<div id="dashCards" class="kpi-grid" style="margin-bottom:16px">
+  {% for i in range(5) %}<div class="skeleton kpi-skel"></div>{% endfor %}
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-pane="vouchers">اسناد واریز</button>
+  <button class="tab" data-pane="expenses">هزینه‌ها</button>
+  <button class="tab" data-pane="accounts">مانده حساب‌ها</button>
+  <button class="tab" data-pane="projects">تفکیک پروژه</button>
+  <button class="tab" data-pane="debtors">بدهکاران</button>
+</div>
+
+<!-- تب واریز -->
+<div id="pane-vouchers" class="tab-pane active">
+  <div class="card">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input class="input" id="fSearch" placeholder="جستجو واریزکننده، پیگیری…" oninput="searchChanged()" style="flex:1;min-width:160px">
+      <select class="input" id="fAccount" onchange="goPage(1)" style="max-width:190px"><option value="">همه حساب‌ها</option></select>
+      <select class="input" id="fStatus" onchange="goPage(1)" style="max-width:120px">
+        <option value="">همه اسناد</option><option value="active">فعال</option><option value="voided">ابطال‌شده</option>
+      </select>
+      <input class="input" id="fFrom" placeholder="از 1404/01/01" style="max-width:140px" onchange="goPage(1)">
+      <input class="input" id="fTo" placeholder="تا" style="max-width:120px" onchange="goPage(1)">
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;align-items:center">
+      <span id="totalsBar"></span>
+      <a class="btn-outline btn-sm" href="/api/accounting/vouchers/export?format=xlsx" download><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-1px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> خروجی Excel</a>
+      <a class="btn-outline btn-sm" href="/api/accounting/vouchers/export?format=pdf" download>📄 خروجی PDF</a>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>سند</th><th>واریزکننده</th><th>حساب</th><th>مبلغ</th><th>تخصیص</th><th>تاریخ/ساعت</th><th>روش</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+      <tbody id="vTbody"></tbody>
+    </table></div>
+    <div id="pgBar" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid var(--border)"></div>
+  </div>
+</div>
+
+<!-- تب هزینه‌ها -->
+<div id="pane-expenses" class="tab-pane">
+  <div class="card">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input class="input" id="eSearch" placeholder="جستجو دریافت‌کننده…" oninput="expSearchChanged()" style="flex:1;min-width:160px">
+      <select class="input" id="eCat" onchange="loadExpenses()" style="max-width:150px">
+        <option value="">همه دسته‌ها</option><option value="land">خرید زمین</option><option value="contractor">پیمانکار</option>
+        <option value="admin">اداری</option><option value="utility">خدمات</option><option value="other">سایر</option>
+      </select>
+      <select class="input" id="eStatus" onchange="loadExpenses()" style="max-width:120px">
+        <option value="">همه</option><option value="active">فعال</option><option value="voided">ابطال‌شده</option>
+      </select>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;align-items:center">
+      <span id="eTotalsBar"></span>
+      <a class="btn-outline btn-sm" href="/api/accounting/expenses/export?format=xlsx" download><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-1px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> خروجی Excel</a>
+      <a class="btn-outline btn-sm" href="/api/accounting/expenses/export?format=pdf" download>📄 خروجی PDF</a>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>سند</th><th>بابت (دریافت‌کننده)</th><th>دسته</th><th>پروژه</th><th>مبلغ</th><th>تاریخ</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+      <tbody id="eTbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- تب مانده حساب‌ها -->
+<div id="pane-accounts" class="tab-pane">
+  <div id="balancesList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
+</div>
+
+<!-- تب تفکیک پروژه -->
+<div id="pane-projects" class="tab-pane">
+  <div class="card"><div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>پروژه</th><th>کل بدهی (اقساط)</th><th>وصول‌شده</th><th>مانده</th><th>هزینه پروژه</th><th>درصد وصول</th></tr></thead>
+    <tbody id="projTbody"></tbody>
+  </table></div></div>
+</div>
+
+<!-- تب بدهکاران — پیگیری بدهکار/بستانکار هر عضو -->
+<div id="pane-debtors" class="tab-pane">
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+    <input class="input" id="drSearch" placeholder="جستجو نام یا کد ملی…" oninput="renderDebtors()" style="max-width:260px">
+    <span style="font-size:12px;color:var(--muted)">فقط اعضایی که بدهی/واریزی ثبت‌شده دارند نمایش داده می‌شوند — به ترتیب بیشترین مانده بدهی</span>
+  </div>
+  <div class="card"><div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>عضو</th><th>کد ملی</th><th>کل بدهی</th><th>پرداخت‌شده/بستانکار</th><th>مانده بدهی</th><th>کل واریزی</th><th>عملیات</th></tr></thead>
+    <tbody id="drTbody"><tr><td colspan="7"><div class="loading-row">در حال بارگذاری…</div></td></tr></tbody>
+  </table></div></div>
+</div>
+
+<!-- Modal: سند واریز -->
+<div class="modal" id="voucherModal"><div class="modal-box" style="max-width:560px">
+  <div class="modal-head"><span class="modal-title">ثبت سند واریز</span><button class="modal-x" onclick="modal.close('voucherModal')">×</button></div>
+  <div class="modal-body">
+    <div id="vErr" class="alert alert-bad" style="display:none"></div>
+    <div class="field"><label>واریزکننده (عضو)</label><select class="input" id="vUser"><option value="">— عضو نیست / نام آزاد —</option></select></div>
+    <div class="field" id="vPayerWrap"><label>نام واریزکننده (غیر عضو)</label><input class="input" id="vPayer"></div>
+    <div class="grid-2">
+      <div class="field"><label>حساب مقصد *</label><select class="input" id="vAccount"></select></div>
+      <div class="field"><label>مبلغ (ریال) *</label><input class="input mono" id="vAmount" inputmode="numeric" oninput="fmtAmt(this)"></div>
+      <div class="field"><label>تاریخ واریز *</label><input class="input" id="vDate" data-jdp placeholder="1404/05/01"></div>
+      <div class="field"><label>ساعت</label><input class="input" id="vTime" placeholder="14:30"></div>
+      <div class="field"><label>روش</label><select class="input" id="vMethod">
+        <option value="card">کارت به کارت</option><option value="transfer">انتقال بانکی</option>
+        <option value="cash">نقدی</option><option value="cheque">چک</option><option value="other">سایر</option></select></div>
+      <div class="field"><label>شماره پیگیری</label><input class="input mono" id="vRef"></div>
+    </div>
+    <div class="field"><label>شرح سند</label><textarea class="input" id="vDesc" rows="2"></textarea></div>
+    <div class="field"><label>فیش واریز (اختیاری)</label><input type="file" class="input" id="vReceipt" accept="image/*,.pdf"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-gold" onclick="submitVoucher(this)">ثبت سند</button><button class="btn btn-ghost" onclick="modal.close('voucherModal')">انصراف</button></div>
+</div></div>
+
+<!-- Modal: سند هزینه -->
+<div class="modal" id="expenseModal"><div class="modal-box" style="max-width:560px">
+  <div class="modal-head"><span class="modal-title">ثبت سند هزینه</span><button class="modal-x" onclick="modal.close('expenseModal')">×</button></div>
+  <div class="modal-body">
+    <div id="eErr" class="alert alert-bad" style="display:none"></div>
+    <div class="grid-2">
+      <div class="field"><label>پرداخت از حساب *</label><select class="input" id="eAccount"></select></div>
+      <div class="field"><label>دریافت‌کننده (بابت) *</label><input class="input" id="ePayee" placeholder="پیمانکار / فروشنده"></div>
+      <div class="field"><label>دسته</label><select class="input" id="eCategory">
+        <option value="land">خرید زمین</option><option value="contractor">پیمانکار</option>
+        <option value="admin">اداری</option><option value="utility">خدمات/تأسیسات</option><option value="other" selected>سایر</option></select></div>
+      <div class="field"><label>پروژه (اختیاری)</label><select class="input" id="eProject"><option value="">— عمومی —</option></select></div>
+      <div class="field"><label>مبلغ (ریال) *</label><input class="input mono" id="eAmount" inputmode="numeric" oninput="fmtAmt(this)"></div>
+      <div class="field"><label>تاریخ *</label><input class="input" id="eDate" data-jdp placeholder="1404/05/01"></div>
+      <div class="field"><label>شماره پیگیری</label><input class="input mono" id="eRef"></div>
+    </div>
+    <div class="field"><label>شرح</label><textarea class="input" id="eDesc" rows="2"></textarea></div>
+    <div class="field"><label>فیش/فاکتور (اختیاری)</label><input type="file" class="input" id="eReceipt" accept="image/*,.pdf"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-navy" onclick="submitExpense(this)">ثبت هزینه</button><button class="btn btn-ghost" onclick="modal.close('expenseModal')">انصراف</button></div>
+</div></div>
+
+<!-- Modal: تخصیص سند به اقساط -->
+<div class="modal" id="allocModal"><div class="modal-box" style="max-width:560px">
+  <div class="modal-head"><span class="modal-title">تخصیص سند به اقساط</span><button class="modal-x" onclick="modal.close('allocModal')">×</button></div>
+  <div class="modal-body">
+    <div id="allocInfo" style="font-size:13px;margin-bottom:12px"></div>
+    <div id="allocList"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-gold" onclick="saveAlloc(this)">ذخیره تخصیص</button><button class="btn btn-ghost" onclick="modal.close('allocModal')">انصراف</button></div>
+</div></div>
+
+<!-- Modal: ابطال -->
+<div class="modal" id="voidModal"><div class="modal-box" style="max-width:420px">
+  <div class="modal-head"><span class="modal-title">ابطال سند</span><button class="modal-x" onclick="modal.close('voidModal')">×</button></div>
+  <div class="modal-body"><div class="alert alert-bad" style="margin-bottom:12px">سند حذف نمی‌شود — با دلیل «ابطال» می‌شود.</div>
+    <div class="field"><label>دلیل ابطال *</label><textarea class="input" id="voidReason" rows="3"></textarea></div></div>
+  <div class="modal-foot"><button class="btn btn-bad" onclick="doVoid(this)">ابطال</button><button class="btn btn-ghost" onclick="modal.close('voidModal')">انصراف</button></div>
+</div></div>
+
+<!-- Modal: حساب‌ها -->
+<div class="modal" id="accountsModal"><div class="modal-box" style="max-width:620px">
+  <div class="modal-head"><span class="modal-title">حساب‌های تعاونی</span><button class="modal-x" onclick="modal.close('accountsModal')">×</button></div>
+  <div class="modal-body">
+    <div class="card card-p" style="margin-bottom:14px;background:var(--bg)"><div class="grid-2">
+      <div class="field"><label>نام صاحب حساب *</label><input class="input" id="aHolder"></div>
+      <div class="field"><label>سمت</label><input class="input" id="aRole" placeholder="مدیر / هیئت امنا"></div>
+      <div class="field"><label>بانک</label><input class="input" id="aBank"></div>
+      <div class="field"><label>شماره کارت</label><input class="input mono" id="aCard"></div>
+      <div class="field"><label>شماره حساب</label><input class="input mono" id="aNum"></div>
+      <div class="field"><label>شبا</label><input class="input mono" id="aIban"></div>
+    </div><button class="btn btn-navy btn-sm" onclick="addAccount(this)">افزودن حساب</button></div>
+    <div id="accountsList"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="modal.close('accountsModal')">بستن</button></div>
+</div></div>
+
+{% if user.role == 'admin' %}
+<!-- Modal: دسترسی مالی -->
+<div class="modal" id="financeModal"><div class="modal-box" style="max-width:520px">
+  <div class="modal-head"><span class="modal-title">کاربران دارای دسترسی مالی</span><button class="modal-x" onclick="modal.close('financeModal')">×</button></div>
+  <div class="modal-body">
+    <div class="alert alert-info" style="margin-bottom:12px">مسئول مالی فقط به بخش مالی و حسابداری دسترسی دارد، نه مدیریت اعضا و تنظیمات.</div>
+    <div class="card card-p" style="margin-bottom:14px;background:var(--bg)">
+      <div class="field"><label>ارتقای عضو به مسئول مالی</label>
+        <select class="input" id="promoteUser"><option value="">— انتخاب عضو —</option></select></div>
+      <button class="btn btn-navy btn-sm" onclick="promoteFinance(this)">اعطای دسترسی مالی</button>
+    </div>
+    <div id="financeList"></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="modal.close('financeModal')">بستن</button></div>
+</div></div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var methodLabel={card:'کارت به کارت',transfer:'انتقال بانکی',cash:'نقدی',cheque:'چک',other:'سایر'};
+var catLabel={land:'خرید زمین',contractor:'پیمانکار',admin:'اداری',utility:'خدمات',other:'سایر'};
+var accounts=[], projects=[], curPage=1, searchTimer=null, expTimer=null, voidCtx=null, allocVoucher=null;
+
+function skeletonRows(cols, n){
+  var cell='<td class="tbl-skel-cell"><div class="skeleton tbl-skel-bar"></div></td>';
+  return Array.from({length:n||6}).map(function(){return '<tr>'+cell.repeat(cols)+'</tr>';}).join('');
+}
+
+function fmtAmt(inp){var raw=inp.value.replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d);}).replace(/[^0-9]/g,'');inp.dataset.raw=raw;inp.value=raw?Number(raw).toLocaleString('en-US'):'';}
+function rawAmt(id){var el=document.getElementById(id);return el.dataset.raw||el.value.replace(/,/g,'');}
+function fmt(n){return Number(n||0).toLocaleString();}
+function receiptBtn(path, label){
+  var isImg=/\.(jpg|jpeg|png|gif|webp)$/i.test(path);
+  if(isImg){
+    return '<a class="btn-outline btn-sm" href="#" onclick="imgViewer.open({src:\'/uploads/'+path+'\',label:'+JSON.stringify(label)+'});return false;">فیش</a> ';
+  }
+  return '<a class="btn-outline btn-sm" href="/uploads/'+path+'" target="_blank">فیش</a> ';
+}
+
+function initTabs(){document.querySelectorAll('.tabs').forEach(function(tabs){tabs.querySelectorAll('.tab').forEach(function(btn){btn.addEventListener('click',function(){var pane=btn.dataset.pane;tabs.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b===btn);});document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.toggle('active',p.id==='pane-'+pane);});if(pane==='expenses')loadExpenses();if(pane==='accounts')loadBalances();if(pane==='projects')loadProjectsSummary();if(pane==='debtors')loadDebtors();});});});}
+
+function loadDashboard(){
+  fetch('/api/accounting/dashboard').then(function(r){return r.ok?r.json():null;}).then(function(d){
+    if(!d){document.getElementById('dashCards').innerHTML='<div class="card card-p" style="grid-column:1/-1;color:var(--muted)">خطا در بارگذاری</div>';return;}
+    var cards=[
+      {label:'کل واریزی‌ها',val:fmt(d.total_deposited),cls:''},
+      {label:'کل هزینه‌ها',val:fmt(d.total_expenses),cls:''},
+      {label:'موجودی کل',val:fmt(d.balance),cls:''},
+      {label:'وصول اقساط',val:d.collection_rate+'٪',cls:''},
+      {label:'اقساط معوق',val:d.overdue_count,sub:fmt(d.overdue_amount)+' ریال',cls:d.overdue_count?'bad':''},
+    ];
+    document.getElementById('dashCards').innerHTML=cards.map(function(c){
+      return '<div class="kpi-card" style="cursor:default"><div class="kpi-top"><span class="kpi-label">'+c.label+'</span></div>'+
+        '<div class="kpi-value'+(c.cls?' '+c.cls:'')+'">'+c.val+'</div>'+
+        (c.sub?'<div class="kpi-sub">'+c.sub+'</div>':'')+'</div>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('dashCards').innerHTML='<div class="card card-p" style="grid-column:1/-1;color:var(--muted)">خطا در ارتباط با سرور</div>';
+  });
+}
+
+function loadAccounts(){
+  return fetch('/api/accounting/accounts').then(function(r){return r.json();}).then(function(d){
+    accounts=d.accounts||[];
+    var actOpts=accounts.filter(function(a){return a.active;}).map(function(a){return '<option value="'+a.id+'">'+esc(a.holder_name)+(a.holder_role?' ('+esc(a.holder_role)+')':'')+'</option>';}).join('');
+    document.getElementById('fAccount').innerHTML='<option value="">همه حساب‌ها</option>'+accounts.map(function(a){return '<option value="'+a.id+'">'+esc(a.holder_name)+'</option>';}).join('');
+    document.getElementById('vAccount').innerHTML=actOpts;
+    document.getElementById('eAccount').innerHTML=actOpts;
+    renderAccountsList();
+  });
+}
+function renderAccountsList(){
+  document.getElementById('accountsList').innerHTML=accounts.map(function(a){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;'+(a.active?'':'opacity:.55')+'">'+
+      '<div style="flex:1"><b>'+esc(a.holder_name)+'</b>'+(a.holder_role?' <small style="color:var(--muted)">('+esc(a.holder_role)+')</small>':'')+
+      '<br><small style="color:var(--muted)">'+[a.bank_name,a.card_number,a.account_number].filter(Boolean).join(' · ')+'</small></div>'+
+      '<button class="btn-outline btn-sm" onclick="toggleAccount('+a.id+','+(!a.active)+')">'+(a.active?'غیرفعال':'فعال')+'</button></div>';
+  }).join('')||'<div class="empty" style="padding:14px">حسابی ثبت نشده</div>';
+}
+function toggleAccount(id,active){fetch('/api/accounting/accounts/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active:active})}).then(function(){loadAccounts().then(function(){loadDashboard();});});}
+function addAccount(btn){var h=document.getElementById('aHolder').value.trim();if(!h){toast('نام صاحب حساب را وارد کنید','warn');return;}btnLoading(btn,true);
+  fetch('/api/accounting/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({holder_name:h,holder_role:$v('aRole'),bank_name:$v('aBank'),card_number:$v('aCard'),account_number:$v('aNum'),iban:$v('aIban')})})
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){toast('حساب اضافه شد');['aHolder','aRole','aBank','aCard','aNum','aIban'].forEach(function(i){document.getElementById(i).value='';});loadAccounts();}else toast(x.d.error||'خطا','warn');});}
+function $v(id){return document.getElementById(id).value.trim();}
+function openAccounts(){modal.open('accountsModal');}
+
+function loadMembers(){fetch('/api/members').then(function(r){return r.json();}).then(function(d){
+  var opts=(d.members||[]).map(function(m){return '<option value="'+m.id+'">'+esc(m.full_name)+(m.national_code?' — '+esc(m.national_code):'')+'</option>';}).join('');
+  document.getElementById('vUser').innerHTML='<option value="">— عضو نیست / نام آزاد —</option>'+opts;
+  var pu=document.getElementById('promoteUser');if(pu)pu.innerHTML='<option value="">— انتخاب عضو —</option>'+opts;
+});}
+function loadProjects(){fetch('/api/projects').then(function(r){return r.json();}).then(function(d){projects=d.projects||[];document.getElementById('eProject').innerHTML='<option value="">— عمومی —</option>'+projects.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');});}
+
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='vUser')document.getElementById('vPayerWrap').style.display=e.target.value?'none':'';});
+
+/* ── واریز ── */
+function searchChanged(){clearTimeout(searchTimer);searchTimer=setTimeout(function(){goPage(1);},400);}
+function goPage(p){curPage=p;loadVouchers();}
+function openNewVoucher(){if(!accounts.filter(function(a){return a.active;}).length){toast('اول یک حساب تعریف کنید','warn');openAccounts();return;}['vPayer','vAmount','vTime','vRef','vDesc'].forEach(function(i){document.getElementById(i).value='';});document.getElementById('vReceipt').value='';document.getElementById('vUser').value='';document.getElementById('vPayerWrap').style.display='';document.getElementById('vErr').style.display='none';modal.open('voucherModal');}
+function submitVoucher(btn){var err=document.getElementById('vErr');err.style.display='none';var fd=new FormData();fd.append('account_id',$v('vAccount'));fd.append('amount',rawAmt('vAmount'));fd.append('deposit_date',$v('vDate'));fd.append('deposit_time',$v('vTime'));fd.append('method',$v('vMethod'));fd.append('reference_no',$v('vRef'));fd.append('description',$v('vDesc'));var uid=$v('vUser');if(uid)fd.append('user_id',uid);else fd.append('payer_name',$v('vPayer'));var f=document.getElementById('vReceipt').files[0];if(f)fd.append('receipt',f);btnLoading(btn,true);
+  fetch('/api/accounting/vouchers',{method:'POST',body:fd}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){modal.close('voucherModal');toast('سند #'+x.d.voucher.number+' ثبت شد');loadVouchers();loadDashboard();}else{err.textContent=x.d.error||'خطا';err.style.display='';}}).catch(function(){btnLoading(btn,false);err.textContent='خطا در سرور';err.style.display='';});}
+
+function loadVouchers(){var p=new URLSearchParams({page:curPage,per_page:30});var s=$v('fSearch');if(s)p.set('search',s);var a=$v('fAccount');if(a)p.set('account_id',a);var st=$v('fStatus');if(st)p.set('status',st);var df=$v('fFrom');if(df)p.set('date_from',df);var dt=$v('fTo');if(dt)p.set('date_to',dt);
+  document.getElementById('vTbody').innerHTML=skeletonRows(9);
+  fetch('/api/accounting/vouchers?'+p).then(function(r){return r.json();}).then(function(d){
+    document.getElementById('totalsBar').innerHTML='<b>'+d.total+'</b> سند — جمع فعال: <b style="color:var(--navy)">'+fmt(d.total_amount)+' ریال</b>';
+    var tb=document.getElementById('vTbody');
+    if(!d.vouchers.length){tb.innerHTML='<tr><td colspan="9"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>سندی یافت نشد</div></td></tr>';}
+    else tb.innerHTML=d.vouchers.map(function(v){var voided=v.status==='voided';
+      return '<tr style="'+(voided?'opacity:.5':'')+'">'+
+        '<td class="mono"><b>#'+v.number+'</b></td><td>'+esc(v.payer_name)+'</td>'+
+        '<td style="font-size:12px">'+v.account_label+'</td><td class="mono"><b>'+fmt(v.amount)+'</b></td>'+
+        '<td>'+(v.user_id&&!voided?'<button class="btn-outline btn-sm" onclick="openAlloc('+v.id+')">تخصیص</button>':'—')+'</td>'+
+        '<td class="mono" style="font-size:12px">'+v.deposit_date+(v.deposit_time?' — '+v.deposit_time:'')+'</td>'+
+        '<td style="font-size:12px">'+(methodLabel[v.method]||v.method)+'</td>'+
+        '<td>'+(voided?'<span class="badge b-bad" title="'+(v.void_reason||'')+'">ابطال</span>':'<span class="badge b-ok">فعال</span>')+'</td>'+
+        '<td style="white-space:nowrap">'+(v.receipt_path?receiptBtn(v.receipt_path,'سند واریز #'+v.number):'')+
+          '<a class="btn-outline btn-sm" href="/dashboard/accounting/receipt/'+v.id+'" target="_blank">رسید</a> '+
+          (!voided?'<button class="btn-outline bad btn-sm" onclick="openVoid(\'voucher\','+v.id+')">ابطال</button>':'')+'</td></tr>';
+    }).join('');
+    var bar=document.getElementById('pgBar');bar.innerHTML=d.pages<=1?'':'<button class="btn-outline btn-sm" '+(d.page<=1?'disabled':'')+' onclick="goPage('+(d.page-1)+')">قبلی</button><span style="font-size:13px">صفحه '+d.page+' از '+d.pages+'</span><button class="btn-outline btn-sm" '+(d.page>=d.pages?'disabled':'')+' onclick="goPage('+(d.page+1)+')">بعدی</button>';
+  });}
+
+/* ── تخصیص ── */
+function openAlloc(vid){allocVoucher=vid;fetch('/api/accounting/vouchers/'+vid+'/allocations').then(function(r){return r.json();}).then(function(d){
+  document.getElementById('allocInfo').innerHTML='سند #'+d.voucher.number+' — مبلغ: <b>'+fmt(d.voucher.amount)+'</b> ریال | تخصیص‌یافته: <b id="allocUsed">'+fmt(d.used)+'</b> | باقی: <b id="allocRem">'+fmt(d.remaining)+'</b>';
+  var allocMap={};(d.allocations||[]).forEach(function(a){allocMap[a.payment_id]=a.amount;});
+  if(!d.open_payments.length){document.getElementById('allocList').innerHTML='<div class="empty" style="padding:14px">قسطی برای این عضو نیست</div>';}
+  else document.getElementById('allocList').innerHTML=d.open_payments.map(function(p){var cur=allocMap[p.id]||0;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">'+
+      '<div style="flex:1;font-size:12px"><b>'+esc(p.description||'قسط')+'</b><br><span style="color:var(--muted)">سررسید '+esc(p.due_date)+' — مبلغ '+fmt(p.amount)+' — پرداخت‌شده '+fmt(p.allocated)+'</span></div>'+
+      '<input class="input mono" style="max-width:130px" data-pid="'+p.id+'" data-max="'+(p.remaining+cur)+'" value="'+(cur?Number(cur).toLocaleString('en-US'):'')+'" inputmode="numeric" oninput="fmtAlloc(this)" placeholder="0">'+
+      '</div>';
+  }).join('');
+  modal.open('allocModal');});}
+function fmtAlloc(inp){var raw=inp.value.replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d);}).replace(/[^0-9]/g,'');inp.dataset.raw=raw;inp.value=raw?Number(raw).toLocaleString('en-US'):'';}
+function saveAlloc(btn){var items=[];document.querySelectorAll('#allocList input').forEach(function(inp){var amt=parseInt(inp.dataset.raw||inp.value.replace(/,/g,''))||0;if(amt>0)items.push({payment_id:parseInt(inp.dataset.pid),amount:amt});});btnLoading(btn,true);
+  fetch('/api/accounting/vouchers/'+allocVoucher+'/allocate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items})}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){modal.close('allocModal');toast('تخصیص ذخیره شد');loadVouchers();loadDashboard();}else toast(x.d.error||'خطا','warn');});}
+
+/* ── هزینه ── */
+function expSearchChanged(){clearTimeout(expTimer);expTimer=setTimeout(loadExpenses,400);}
+function openNewExpense(){if(!accounts.filter(function(a){return a.active;}).length){toast('اول یک حساب تعریف کنید','warn');openAccounts();return;}['ePayee','eAmount','eRef','eDesc'].forEach(function(i){document.getElementById(i).value='';});document.getElementById('eReceipt').value='';document.getElementById('eErr').style.display='none';modal.open('expenseModal');}
+function submitExpense(btn){var err=document.getElementById('eErr');err.style.display='none';var fd=new FormData();fd.append('account_id',$v('eAccount'));fd.append('payee',$v('ePayee'));fd.append('category',$v('eCategory'));fd.append('project_id',$v('eProject'));fd.append('amount',rawAmt('eAmount'));fd.append('spend_date',$v('eDate'));fd.append('reference_no',$v('eRef'));fd.append('description',$v('eDesc'));var f=document.getElementById('eReceipt').files[0];if(f)fd.append('receipt',f);btnLoading(btn,true);
+  fetch('/api/accounting/expenses',{method:'POST',body:fd}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){modal.close('expenseModal');toast('هزینه #'+x.d.expense.number+' ثبت شد');loadExpenses();loadDashboard();}else{err.textContent=x.d.error||'خطا';err.style.display='';}});}
+function loadExpenses(){var p=new URLSearchParams();var s=$v('eSearch');if(s)p.set('search',s);var c=$v('eCat');if(c)p.set('category',c);var st=$v('eStatus');if(st)p.set('status',st);
+  document.getElementById('eTbody').innerHTML=skeletonRows(8);
+  fetch('/api/accounting/expenses?'+p).then(function(r){return r.json();}).then(function(d){
+    document.getElementById('eTotalsBar').innerHTML='<b>'+d.total+'</b> سند — جمع فعال: <b style="color:var(--bad)">'+fmt(d.total_amount)+' ریال</b>';
+    var tb=document.getElementById('eTbody');
+    if(!d.expenses.length){tb.innerHTML='<tr><td colspan="8"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>هزینه‌ای ثبت نشده</div></td></tr>';return;}
+    tb.innerHTML=d.expenses.map(function(e){var voided=e.status==='voided';
+      return '<tr style="'+(voided?'opacity:.5':'')+'"><td class="mono"><b>#'+e.number+'</b></td><td>'+esc(e.payee)+'</td>'+
+        '<td style="font-size:12px">'+(catLabel[e.category]||e.category)+'</td><td style="font-size:12px">'+(e.project_name||'—')+'</td>'+
+        '<td class="mono"><b>'+fmt(e.amount)+'</b></td><td class="mono" style="font-size:12px">'+e.spend_date+'</td>'+
+        '<td>'+(voided?'<span class="badge b-bad" title="'+(e.void_reason||'')+'">ابطال</span>':'<span class="badge b-ok">فعال</span>')+'</td>'+
+        '<td style="white-space:nowrap">'+(e.receipt_path?receiptBtn(e.receipt_path,'سند هزینه #'+e.number):'')+
+        (!voided?'<button class="btn-outline bad btn-sm" onclick="openVoid(\'expense\','+e.id+')">ابطال</button>':'')+'</td></tr>';
+    }).join('');
+  });}
+
+/* ── مانده / پروژه ── */
+function loadBalances(){fetch('/api/accounting/summary').then(function(r){return r.json();}).then(function(d){
+  document.getElementById('balancesList').innerHTML=(d.summary||[]).map(function(s){var a=s.account;
+    return '<div class="card card-p" style="'+(a.active?'':'opacity:.55')+'"><div style="font-weight:800">'+esc(a.holder_name)+(a.holder_role?' <small style="color:var(--muted);font-weight:400">('+esc(a.holder_role)+')</small>':'')+'</div>'+
+      '<div style="margin-top:8px;font-size:12px;display:flex;justify-content:space-between"><span style="color:var(--muted)">واریزی</span><b style="color:var(--ok)">'+fmt(s.deposits)+'</b></div>'+
+      '<div style="font-size:12px;display:flex;justify-content:space-between"><span style="color:var(--muted)">هزینه</span><b style="color:var(--bad)">'+fmt(s.expenses)+'</b></div>'+
+      '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:14px;display:flex;justify-content:space-between"><b>موجودی</b><b style="color:var(--navy)">'+fmt(s.balance)+'</b></div></div>';
+  }).join('')||'<div class="empty" style="grid-column:1/-1"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>حسابی تعریف نشده</div>';});}
+function loadProjectsSummary(){fetch('/api/accounting/projects-summary').then(function(r){return r.json();}).then(function(d){
+  document.getElementById('projTbody').innerHTML=(d.projects||[]).map(function(p){
+    return '<tr><td><b>'+p.project_name+'</b></td><td class="mono">'+fmt(p.billed)+'</td><td class="mono" style="color:var(--ok)">'+fmt(p.collected)+'</td>'+
+      '<td class="mono" style="color:var(--bad)">'+fmt(p.remaining)+'</td><td class="mono">'+fmt(p.expenses)+'</td>'+
+      '<td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:'+Math.min(100,p.collection_rate)+'%;height:100%;background:var(--ok)"></div></div><span style="font-size:12px">'+p.collection_rate+'٪</span></div></td></tr>';
+  }).join('')||'<tr><td colspan="6"><div class="empty" style="padding:20px">پروژه‌ای نیست</div></td></tr>';});}
+
+/* ── بدهکاران ── */
+var allDebtors=[];
+function loadDebtors(){
+  fetch('/api/accounting/members-balances').then(function(r){return r.json();}).then(function(d){
+    allDebtors=d.members||[];
+    renderDebtors();
+  });
+}
+function renderDebtors(){
+  var q=($v('drSearch')||'').toLowerCase();
+  var rows=allDebtors.filter(function(m){
+    return !q || m.full_name.toLowerCase().indexOf(q)>-1 || (m.national_code||'').indexOf(q)>-1;
+  });
+  document.getElementById('drTbody').innerHTML=rows.map(function(m){
+    return '<tr><td><b>'+esc(m.full_name)+'</b></td><td class="mono">'+esc(m.national_code||'—')+'</td>'+
+      '<td class="mono">'+fmt(m.debt)+'</td><td class="mono" style="color:var(--ok)">'+fmt(m.paid)+'</td>'+
+      '<td class="mono" style="color:'+(m.remaining_debt>0?'var(--bad)':'var(--ok)')+'">'+fmt(m.remaining_debt)+'</td>'+
+      '<td class="mono">'+fmt(m.deposited)+'</td>'+
+      '<td><a class="btn-outline btn-sm" href="/dashboard/accounting/statement/'+m.id+'">کارت حساب</a></td></tr>';
+  }).join('')||'<tr><td colspan="7"><div class="empty" style="padding:20px">'+(q?'موردی یافت نشد':'هنوز بدهی/واریزی ثبت نشده')+'</div></td></tr>';
+}
+
+/* ── ابطال عام ── */
+function openVoid(kind,id){voidCtx={kind:kind,id:id};document.getElementById('voidReason').value='';modal.open('voidModal');}
+function doVoid(btn){var reason=document.getElementById('voidReason').value.trim();if(!reason){toast('دلیل ابطال را وارد کنید','warn');return;}btnLoading(btn,true);var url=voidCtx.kind==='expense'?'/api/accounting/expenses/'+voidCtx.id+'/void':'/api/accounting/vouchers/'+voidCtx.id+'/void';
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){modal.close('voidModal');toast('ابطال شد','warn');loadVouchers();loadExpenses();loadDashboard();}else toast(x.d.error||'خطا','warn');});}
+
+{% if user.role == 'admin' %}
+/* ── دسترسی مالی ── */
+function openFinanceAccess(){loadFinanceUsers();modal.open('financeModal');}
+function loadFinanceUsers(){fetch('/api/finance-users').then(function(r){return r.json();}).then(function(d){
+  document.getElementById('financeList').innerHTML=(d.finance_users||[]).map(function(u){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px"><div style="flex:1"><b>'+esc(u.full_name)+'</b> <small style="color:var(--muted)">'+esc(u.username)+'</small></div><button class="btn-outline bad btn-sm" onclick="revokeFinance('+u.id+')">لغو دسترسی</button></div>';
+  }).join('')||'<div class="empty" style="padding:14px">کاربر مالی ثبت نشده</div>';});}
+function promoteFinance(btn){var uid=document.getElementById('promoteUser').value;if(!uid){toast('عضو را انتخاب کنید','warn');return;}btnLoading(btn,true);
+  fetch('/api/members/'+uid+'/set-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'finance'})}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){toast('دسترسی مالی داده شد');loadFinanceUsers();loadMembers();}else toast(x.d.error||'خطا','warn');});}
+function revokeFinance(uid){fetch('/api/members/'+uid+'/set-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'member'})}).then(function(r){return r.json();}).then(function(d){if(d.ok){toast('دسترسی لغو شد');loadFinanceUsers();loadMembers();}else toast(d.error||'خطا','warn');});}
+{% endif %}
+
+loadAccounts().then(function(){loadDashboard();loadVouchers();});
+loadMembers();loadProjects();initTabs();
+if(window.jalaliDatepicker)jalaliDatepicker.startWatch();
+</script>
+{% endblock %}

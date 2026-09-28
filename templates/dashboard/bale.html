@@ -1,0 +1,351 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <div>
+    <h1 class="pg-title">ربات بله</h1>
+    <p class="pg-sub">اتصال حساب بله برای دریافت اطلاع‌رسانی‌ها</p>
+  </div>
+</div>
+
+<!-- ── وضعیت اتصال ─────────────────────────────────────── -->
+<div class="card" style="max-width:560px;padding:24px;margin-bottom:20px" id="statusCard">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div id="statusIcon" style="width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;background:var(--bg)">⏳</div>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:15px" id="statusTitle">در حال بررسی…</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:3px" id="statusSub"></div>
+    </div>
+    <div id="statusActions"></div>
+  </div>
+</div>
+
+<!-- ── راهنمای اتصال (پنهان تا وقتی متصل نباشد) ─────── -->
+<div class="card" style="max-width:560px;padding:28px" id="guideCard">
+  <div style="font-weight:700;font-size:15px;color:var(--navy);margin-bottom:20px;display:flex;align-items:center;gap:8px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    راهنمای اتصال به ربات بله
+  </div>
+
+  <!-- Step 1 -->
+  <div class="guide-step">
+    <div class="guide-num">۱</div>
+    <div class="guide-body">
+      <div class="guide-title">ربات را در بله پیدا کنید</div>
+      <div class="guide-desc">
+        اپلیکیشن <strong>بله</strong> را باز کرده، در قسمت جستجو نام ربات را وارد کنید:
+      </div>
+      {% if site_settings.get('bale_bot_username') %}
+      <div class="bot-name-box">
+        <span id="botUsernameText">@{{ site_settings.get('bale_bot_username') }}</span>
+        <button class="copy-btn" onclick="copyBotName()" title="کپی کردن">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          کپی
+        </button>
+      </div>
+      {% else %}
+      <div class="guide-note">نام ربات را از مدیر سامانه دریافت کنید.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="guide-step">
+    <div class="guide-num">۲</div>
+    <div class="guide-body">
+      <div class="guide-title">ربات را شروع کنید</div>
+      <div class="guide-desc">
+        روی دکمه <strong>شروع</strong> یا <strong>Start</strong> در ربات کلیک کنید. ربات پیام خوشامد ارسال می‌کند.
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="guide-step">
+    <div class="guide-num">۳</div>
+    <div class="guide-body">
+      <div class="guide-title">کد پیوند یک‌بارمصرف دریافت کنید</div>
+      <div class="guide-desc">روی دکمه زیر کلیک کنید تا کد ۶ رقمی شما ایجاد شود:</div>
+      <div style="margin-top:12px">
+        <button class="btn btn-navy" id="getCodeBtn" onclick="getCode(this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0"><path d="M12 5v14M5 12h14"/></svg>
+          دریافت کد پیوند
+        </button>
+      </div>
+      <!-- کد نمایش داده می‌شود -->
+      <div id="codeBox" style="display:none;margin-top:14px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">کد ۶ رقمی شما (۱۵ دقیقه اعتبار دارد):</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="codeDisplay" style="font-size:32px;font-weight:800;letter-spacing:10px;color:var(--navy);font-variant-numeric:tabular-nums;direction:ltr;padding:12px 20px;background:var(--bg);border-radius:10px;border:2px dashed var(--border)"></div>
+          <button class="copy-btn" onclick="copyCode()" title="کپی کردن">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            کپی
+          </button>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)" id="codeTimer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="guide-step" style="border-bottom:none">
+    <div class="guide-num">۴</div>
+    <div class="guide-body">
+      <div class="guide-title">کد را برای ربات ارسال کنید</div>
+      <div class="guide-desc">
+        کد ۶ رقمی را در چت ربات بله تایپ کرده و ارسال کنید. ربات اتصال را تأیید می‌کند.
+      </div>
+      <div class="guide-note" style="margin-top:10px">
+        💡 پس از اتصال، اطلاعیه‌ها، وضعیت درخواست‌های انتقال، تأیید پرداخت‌ها و تیکت‌ها مستقیماً در بله دریافت می‌کنید.
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if user.role == 'admin' %}
+
+<!-- ── راهنمای راه‌اندازی ربات (فقط ادمین) ─────────────── -->
+<div class="card" style="max-width:560px;margin-top:20px;padding:28px" id="adminSetupCard">
+  <div style="font-weight:700;font-size:15px;color:var(--navy);margin-bottom:20px;display:flex;align-items:center;gap:8px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    راهنمای راه‌اندازی ربات (مدیر)
+  </div>
+
+  <div class="setup-step">
+    <div class="setup-num">۱</div>
+    <div class="guide-body">
+      <div class="guide-title">ساخت ربات در بله</div>
+      <div class="guide-desc">در بله، جستجو کنید: <strong>@BotFather</strong> — یک چت باز کنید و دستور زیر را ارسال کنید:</div>
+      <div class="cmd-box">/newbot</div>
+      <div class="guide-desc" style="margin-top:8px">نام ربات و username را وارد کنید. در پایان یک <strong>توکن</strong> دریافت می‌کنید.</div>
+    </div>
+  </div>
+
+  <div class="setup-step">
+    <div class="setup-num">۲</div>
+    <div class="guide-body">
+      <div class="guide-title">ثبت توکن در سامانه</div>
+      <div class="guide-desc">به <a href="/dashboard/landing-admin" style="color:var(--navy);font-weight:600">تنظیمات سامانه</a> بروید و در بخش <strong>«تنظیمات ربات بله»</strong>:</div>
+      <ul style="font-size:13px;color:var(--muted);margin:8px 0 0 16px;line-height:2">
+        <li>نام کاربری ربات را وارد کنید (بدون @)</li>
+        <li>توکن را در فیلد مخصوص وارد کنید</li>
+        <li>روی «ذخیره تنظیمات» کلیک کنید</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="setup-step">
+    <div class="setup-num">۳</div>
+    <div class="guide-body">
+      <div class="guide-title">تنظیم Webhook</div>
+      <div class="guide-desc">پس از ذخیره توکن (مرحله ۲)، فقط روی دکمه زیر بزنید تا webhook به‌صورت خودکار تنظیم شود:</div>
+      <button class="btn btn-navy" style="margin-top:4px" onclick="setWebhook(this)">⚡ تنظیم خودکار Webhook</button>
+      <button class="btn btn-ghost btn-sm" style="margin-top:4px;margin-right:8px" onclick="checkWebhook(this)">بررسی وضعیت</button>
+      <div id="webhookResult" class="guide-note" style="margin-top:10px;display:none"></div>
+      <div class="guide-note" style="margin-top:10px">
+        آدرس webhook: <code dir="ltr">https://{{ request.host }}/api/bale/webhook</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-step" style="border-bottom:none">
+    <div class="setup-num">۴</div>
+    <div class="guide-body">
+      <div class="guide-title">تست ربات</div>
+      <div class="guide-desc">ربات را در بله باز کنید، روی <strong>Start</strong> بزنید و کد ۶ رقمی خودتان را ارسال کنید. اگر پیام موفقیت دریافت کردید، همه چیز درست است.</div>
+      <div class="guide-note" style="margin-top:10px">
+        ✅ پس از راه‌اندازی، همه اعضا می‌توانند از طریق همین صفحه حساب خود را متصل کنند.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ارسال پیام گروهی ───────────────────────────────── -->
+<div class="card" style="max-width:560px;margin-top:20px;padding:24px">
+  <div style="font-weight:700;font-size:15px;color:var(--navy);margin-bottom:4px">ارسال پیام گروهی</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
+    پیام به تمامی اعضایی که حساب بله خود را متصل کرده‌اند ارسال می‌شود.
+  </div>
+  <div class="field"><label>عنوان اعلان</label><input class="input" id="broadTitle" placeholder="پیام هیئت"></div>
+  <div class="field"><label>متن پیام <span style="color:var(--bad)">*</span></label>
+    <textarea class="input" id="broadText" rows="4" placeholder="متن پیام را وارد کنید…" style="resize:vertical"></textarea>
+  </div>
+  <button class="btn btn-navy" onclick="sendBroadcast(this)">ارسال به همه اعضا</button>
+</div>
+{% endif %}
+
+<style>
+.guide-step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--border)}
+.guide-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--navy);color:#C8A456;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;margin-top:2px}
+.guide-body{flex:1}
+.guide-title{font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
+.guide-desc{font-size:13px;color:var(--muted);line-height:1.7}
+.guide-note{font-size:12px;color:var(--muted);background:var(--bg);border-radius:8px;padding:10px 14px;line-height:1.7;margin-top:8px;border-right:3px solid var(--accent,#C8A456)}
+.bot-name-box{display:inline-flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-top:10px;font-size:15px;font-weight:700;color:var(--navy);direction:ltr}
+.copy-btn{display:flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;color:var(--muted);transition:all .15s;white-space:nowrap}
+.copy-btn:hover{border-color:var(--navy);color:var(--navy)}
+.setup-step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--border)}
+.setup-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--accent,#C8A456);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;margin-top:2px}
+.cmd-box{font-family:monospace;font-size:13px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:10px 14px;margin-top:8px;direction:ltr;color:var(--navy);word-break:break-all}
+</style>
+
+{% endblock %}
+{% block scripts %}
+<script>
+var currentCode = '';
+var codeTimerInterval = null;
+
+async function checkStatus() {
+  const r = await fetch('/api/bale/status');
+  const d = await r.json();
+  const icon  = document.getElementById('statusIcon');
+  const title = document.getElementById('statusTitle');
+  const sub   = document.getElementById('statusSub');
+  const acts  = document.getElementById('statusActions');
+  const guide = document.getElementById('guideCard');
+
+  if (d.linked) {
+    icon.textContent = '✅';
+    icon.style.background = 'rgba(16,185,129,.12)';
+    title.textContent = 'حساب بله شما متصل است';
+    sub.textContent   = 'اطلاع‌رسانی‌ها از طریق بله ارسال می‌شود';
+    acts.innerHTML    = `<button class="btn btn-ghost" style="color:var(--bad);border-color:var(--bad)" onclick="unlink(this)">قطع اتصال</button>`;
+    guide.style.display = 'none';
+  } else {
+    icon.textContent = '🔔';
+    icon.style.background = 'rgba(200,164,86,.12)';
+    title.textContent = 'هنوز متصل نشده‌اید';
+    sub.textContent   = 'برای دریافت اطلاع‌رسانی‌ها مراحل زیر را انجام دهید';
+    acts.innerHTML    = '';
+    guide.style.display = '';
+  }
+}
+
+async function getCode(btn) {
+  btnLoading(btn, true);
+  const r = await fetch('/api/bale/link-code');
+  btnLoading(btn, false);
+  if (!r.ok) { showToast('خطا در دریافت کد', 'error'); return; }
+  const d = await r.json();
+  currentCode = d.code;
+  document.getElementById('codeDisplay').textContent = currentCode;
+  document.getElementById('codeBox').style.display = '';
+  btn.textContent = 'کد جدید دریافت کنید';
+  btn.style.background = 'var(--bg)';
+  btn.style.color = 'var(--navy)';
+  btn.style.border = '1px solid var(--border)';
+
+  // countdown 15 min
+  var remaining = 15 * 60;
+  clearInterval(codeTimerInterval);
+  updateTimer(remaining);
+  codeTimerInterval = setInterval(function(){
+    remaining--;
+    if(remaining <= 0){ clearInterval(codeTimerInterval); document.getElementById('codeTimer').textContent='کد منقضی شده — کد جدید دریافت کنید.'; return; }
+    updateTimer(remaining);
+  }, 1000);
+
+  // poll for link every 5s
+  pollLink();
+}
+
+function updateTimer(s){
+  var m = Math.floor(s/60), sec = s%60;
+  document.getElementById('codeTimer').textContent = `⏱ اعتبار کد: ${m}:${String(sec).padStart(2,'0')}`;
+}
+
+var pollTimer = null;
+function pollLink(){
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(async function(){
+    const r = await fetch('/api/bale/status');
+    const d = await r.json();
+    if(d.linked){
+      clearInterval(codeTimerInterval);
+      showToast('حساب بله با موفقیت متصل شد ✅');
+      checkStatus();
+    } else {
+      pollLink();
+    }
+  }, 5000);
+}
+
+function copyCode(){
+  navigator.clipboard.writeText(currentCode).then(function(){ showToast('کد کپی شد'); });
+}
+
+function copyBotName(){
+  var txt = document.getElementById('botUsernameText')?.textContent || '';
+  navigator.clipboard.writeText(txt.replace('@','')).then(function(){ showToast('نام ربات کپی شد'); });
+}
+
+async function unlink(btn){
+  if(!confirm('اتصال بله قطع شود؟')) return;
+  btnLoading(btn, true);
+  await fetch('/api/bale/unlink', {method:'POST'});
+  btnLoading(btn, false);
+  showToast('اتصال بله قطع شد');
+  checkStatus();
+}
+
+async function sendBroadcast(btn) {
+  const text  = document.getElementById('broadText').value.trim();
+  const title = document.getElementById('broadTitle').value.trim() || 'پیام هیئت';
+  if (!text) { showToast('متن پیام را وارد کنید.', 'error'); return; }
+  if (!confirm('پیام به تمامی اعضای متصل به بله ارسال شود؟')) return;
+  btnLoading(btn, true);
+  const r = await fetch('/api/bale/broadcast', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title, text})});
+  btnLoading(btn, false);
+  const d = await r.json();
+  if (d.ok) {
+    showToast(`پیام به ${d.sent} عضو ارسال شد`);
+    document.getElementById('broadText').value = '';
+    document.getElementById('broadTitle').value = '';
+  } else {
+    showToast(d.error || 'خطا در ارسال', 'error');
+  }
+}
+
+async function setWebhook(btn) {
+  var box = document.getElementById('webhookResult');
+  btn.disabled = true;
+  try {
+    var r = await fetch('/api/bale/set-webhook', {method: 'POST'});
+    var d = await r.json();
+    box.style.display = '';
+    if (r.ok && d.ok) {
+      box.innerHTML = '✅ Webhook با موفقیت تنظیم شد:<br><code dir="ltr">' + d.webhook + '</code>';
+      showToast('Webhook تنظیم شد');
+    } else {
+      box.innerHTML = '❌ ' + (d.error || 'خطا در تنظیم webhook');
+      showToast(d.error || 'خطا', 'error');
+    }
+  } catch (e) {
+    showToast('خطا در ارتباط با سرور', 'error');
+  }
+  btn.disabled = false;
+}
+
+async function checkWebhook(btn) {
+  var box = document.getElementById('webhookResult');
+  btn.disabled = true;
+  try {
+    var r = await fetch('/api/bale/webhook-info');
+    var d = await r.json();
+    box.style.display = '';
+    var url = (d.result && d.result.url) || '';
+    if (d.ok && url) {
+      box.innerHTML = '✅ Webhook فعال است:<br><code dir="ltr">' + url + '</code>';
+    } else if (d.ok) {
+      box.innerHTML = '⚠️ Webhook هنوز تنظیم نشده است.';
+    } else {
+      box.innerHTML = '❌ ' + (d.description || 'خطا در دریافت وضعیت');
+    }
+  } catch (e) {
+    showToast('خطا در ارتباط با سرور', 'error');
+  }
+  btn.disabled = false;
+}
+
+checkStatus();
+</script>
+{% endblock %}

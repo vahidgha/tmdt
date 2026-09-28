@@ -1,0 +1,339 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="stagger{% if user.role == 'admin' %} dash-home{% endif %}">
+
+  <!-- Welcome Banner -->
+  <div class="banner-card">
+    <div style="position:relative;z-index:1">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;opacity:.85">داشبورد</div>
+      <h1 style="font-size:22px;font-weight:900;color:#F2EBD8;margin-bottom:4px;letter-spacing:-.3px">
+        خوش آمدید، {{ user.full_name }}
+      </h1>
+      <p style="font-size:13px;color:rgba(242,235,216,.55);margin:0">
+        {{ 'پنل مدیریت هیئت امنای مسکن دادگستری زنجان' if user.role == 'admin' else 'سامانه دفترچه مالکیت — پنل کاربری' }}
+      </p>
+    </div>
+    <div class="banner-icon">
+      {% if user.role == 'admin' %}
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-8h6v8"/><path d="M9 9h.01M15 9h.01"/></svg>
+      {% else %}
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3"/><path d="M9 21v-6h6v6"/></svg>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if user.role == 'admin' %}
+
+  <!-- نمای کلی: کارت‌های KPI -->
+  <div class="dash-section-label">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M18 9l-5 5-4-4-4 4"/></svg>
+    نمای کلی
+  </div>
+  <div id="ovCards" class="kpi-grid">
+    {% for i in range(5) %}<div class="skeleton kpi-skel"></div>{% endfor %}
+  </div>
+  <div id="ovPending" style="margin-top:10px"></div>
+
+  <div class="dash-section-label">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+    دسترسی سریع
+  </div>
+  <div class="quick-strip">
+    {% for href, label, icon_svg in [
+      ('/dashboard/projects','پروژه‌ها','<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>'),
+      ('/dashboard/members','اعضا و دفترچه‌ها','<path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>'),
+      ('/dashboard/requests','نقل و انتقال','<path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>'),
+      ('/dashboard/finance','مالی و اقساط','<path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'),
+      ('/dashboard/accounting','حسابداری','<path d="M9 12h6m-6 4h6M9 8h6M5 3h14a1 1 0 011 1v16a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/>'),
+      ('/dashboard/reports','گزارش‌ساز','<path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>'),
+      ('/dashboard/announcements','اطلاعیه‌ها','<path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>'),
+      ('/dashboard/forms','فرم‌ساز','<path d="M9 12h6m-6 4h4M9 8h6M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/>'),
+      ('/dashboard/landing','صفحه عمومی','<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18a14 14 0 010-18z"/>'),
+    ] %}
+    <a class="quick-chip" href="{{ href }}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ icon_svg | safe }}</svg>
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="dash-section-label">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    فعالیت‌های اخیر
+  </div>
+  <div id="ovRecent" class="recent-grid">
+    {% for i in range(3) %}<div class="skeleton" style="height:280px;border-radius:var(--r2)"></div>{% endfor %}
+  </div>
+
+  {% else %}
+
+  <!-- کارت هویت — کلیک برای دیدن/ویرایش اطلاعات شخصی -->
+  <div class="id-card" id="idCard" onclick="openProfileModal()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openProfileModal()">
+    <div class="id-card-avatar" id="idAvatar">؟</div>
+    <div class="id-card-body">
+      <div class="id-card-name" id="idName">در حال بارگذاری…</div>
+      <div class="id-card-meta" id="idMeta">&nbsp;</div>
+    </div>
+    <span class="badge" id="idBadge" style="display:none"></span>
+    <svg class="id-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </div>
+
+  <div class="dash-section-label">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+    دسترسی سریع
+  </div>
+  <div class="stat-grid">
+    {% for href, label, icon_svg in [
+      ('/dashboard/booklet','دفترچه من','<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>'),
+      ('/dashboard/my-payments','اقساط من','<path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>'),
+      ('/dashboard/announcements','اطلاعیه‌ها','<path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>'),
+      ('/dashboard/notifications','اعلان‌ها','<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>'),
+      ('/dashboard/requests','درخواست‌های من','<path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>'),
+      ('/dashboard/bale','ربات بله','<path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>'),
+    ] %}
+    <div class="stat-tile" onclick="location.href='{{ href }}'" role="button" tabindex="0" onkeydown="if(event.key==='Enter')location.href='{{ href }}'">
+      <div class="stat-tile-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ icon_svg | safe }}</svg></div>
+      <div class="stat-tile-label">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+{% if user.role != 'admin' %}
+<!-- Modal: مشاهده/ویرایش اطلاعات شخصی -->
+<div class="modal" id="profileModal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><span class="modal-title">اطلاعات شخصی</span><button class="modal-x" onclick="modal.close('profileModal')">×</button></div>
+    <div class="modal-body">
+      <div id="pfErr" class="alert alert-bad" style="display:none"></div>
+      <div class="grid-2">
+        <div class="field"><label>نام *</label><input class="input" id="pf_fn"></div>
+        <div class="field"><label>نام خانوادگی *</label><input class="input" id="pf_ln"></div>
+        <div class="field"><label>نام پدر *</label><input class="input" id="pf_fa"></div>
+        <div class="field"><label>تاریخ تولد *</label><input class="input" id="pf_bd" placeholder="۱۳۷۰/۰۱/۰۱" data-jdp></div>
+        <div class="field"><label>محل تولد *</label>
+          <select class="input" id="pf_bp">
+            <option value="">— انتخاب استان —</option>
+            {% for p in ['آذربایجان شرقی','آذربایجان غربی','اردبیل','اصفهان','البرز','ایلام','بوشهر','تهران','چهارمحال و بختیاری','خراسان جنوبی','خراسان رضوی','خراسان شمالی','خوزستان','زنجان','سمنان','سیستان و بلوچستان','فارس','قزوین','قم','کردستان','کرمان','کرمانشاه','کهگیلویه و بویراحمد','گلستان','گیلان','لرستان','مازندران','مرکزی','هرمزگان','همدان','یزد'] %}
+            <option>{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field"><label>وضعیت تأهل *</label>
+          <select class="input" id="pf_ms"><option value="">— انتخاب —</option><option>مجرد</option><option>متأهل</option></select>
+        </div>
+        <div class="field"><label>شغل *</label><input class="input" id="pf_occ"></div>
+        <div class="field"><label>موبایل *</label><input class="input" id="pf_ph"></div>
+        <div class="field"><label>تماس ضروری *</label><input class="input" id="pf_em"></div>
+        <div class="field"><label>تلفن ثابت</label><input class="input" id="pf_ll"></div>
+        <div class="field"><label>کد پستی *</label><input class="input mono" id="pf_pc"></div>
+        <div class="field"><label>ایمیل</label><input class="input" id="pf_ml"></div>
+      </div>
+      <div class="field"><label>آدرس کامل *</label><textarea class="input" id="pf_addr" rows="2"></textarea></div>
+      <div class="grid-2">
+        <div class="field"><label>نام بانک *</label><input class="input" id="pf_bk"></div>
+        <div class="field"><label>شماره حساب</label><input class="input mono" id="pf_acc"></div>
+      </div>
+      <div class="field" style="margin-bottom:0"><label>شماره شبا</label><input class="input mono" id="pf_ib" placeholder="IR"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="saveProfileModal(this)">ذخیره</button>
+      <button class="btn btn-ghost" onclick="modal.close('profileModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _pfData = null;
+
+function loadIdCard() {
+  fetch('/api/profile/me').then(function(r){ return r.json(); }).then(function(d){
+    _pfData = d.user;
+    var u = d.user;
+    document.getElementById('idAvatar').textContent = (u.full_name || '؟').trim()[0] || '؟';
+    document.getElementById('idName').textContent = u.full_name || '—';
+    var meta = [];
+    if (u.national_code) meta.push('کد ملی: ' + u.national_code);
+    if (u.phone) meta.push(u.phone);
+    meta.push((d.booklets || []).length + ' دفترچه');
+    document.getElementById('idMeta').textContent = meta.join(' · ');
+    var badge = document.getElementById('idBadge');
+    if (u.profile_actually_complete) {
+      badge.className = 'badge b-ok'; badge.textContent = '✓ اطلاعات تکمیل'; badge.style.display = '';
+    } else {
+      badge.className = 'badge b-warn'; badge.textContent = 'اطلاعات ناقص'; badge.style.display = '';
+    }
+  }).catch(function(){});
+}
+loadIdCard();
+
+function openProfileModal() {
+  if (!_pfData) return;
+  var u = _pfData;
+  document.getElementById('pf_fn').value = u.first_name || '';
+  document.getElementById('pf_ln').value = u.last_name || '';
+  document.getElementById('pf_fa').value = u.father_name || '';
+  document.getElementById('pf_bd').value = u.birth_date || '';
+  document.getElementById('pf_bp').value = u.birth_place || '';
+  document.getElementById('pf_ms').value = u.marital_status || '';
+  document.getElementById('pf_occ').value = u.occupation || '';
+  document.getElementById('pf_ph').value = u.phone || '';
+  document.getElementById('pf_em').value = u.emergency_phone || '';
+  document.getElementById('pf_ll').value = u.landline || '';
+  document.getElementById('pf_pc').value = u.postal_code || '';
+  document.getElementById('pf_ml').value = u.email || '';
+  document.getElementById('pf_addr').value = u.address || '';
+  document.getElementById('pf_bk').value = u.bank_name || '';
+  document.getElementById('pf_acc').value = u.account_number || '';
+  document.getElementById('pf_ib').value = u.iban || '';
+  document.getElementById('pfErr').style.display = 'none';
+  modal.open('profileModal');
+}
+
+window.saveProfileModal = async function(btn) {
+  var err = document.getElementById('pfErr'); err.style.display = 'none';
+  var required = [
+    ['pf_fn','نام'], ['pf_ln','نام خانوادگی'], ['pf_fa','نام پدر'], ['pf_bd','تاریخ تولد'],
+    ['pf_bp','محل تولد'], ['pf_ms','وضعیت تأهل'], ['pf_occ','شغل'], ['pf_ph','موبایل'],
+    ['pf_em','تماس ضروری'], ['pf_pc','کد پستی'], ['pf_addr','آدرس کامل'], ['pf_bk','نام بانک'],
+  ];
+  var missing = required.filter(function(f){ return !$v(f[0]); });
+  if (missing.length) {
+    err.textContent = 'لطفاً فیلدهای الزامی را تکمیل کنید: ' + missing.map(function(f){return f[1];}).join('، ');
+    err.style.display = ''; return;
+  }
+  btnLoading(btn, true);
+  var data = {
+    first_name:$v('pf_fn'), last_name:$v('pf_ln'), father_name:$v('pf_fa'),
+    birth_date:$v('pf_bd'), birth_place:$v('pf_bp'), marital_status:$v('pf_ms'),
+    occupation:$v('pf_occ'), phone:$v('pf_ph'), emergency_phone:$v('pf_em'),
+    landline:$v('pf_ll'), postal_code:$v('pf_pc'), email:$v('pf_ml'), address:$v('pf_addr'),
+    bank_name:$v('pf_bk'), account_number:$v('pf_acc'), iban:$v('pf_ib'),
+  };
+  try {
+    var r = await fetch('/api/profile/complete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    var d = await r.json();
+    btnLoading(btn, false);
+    if (!r.ok) { err.textContent = d.error || 'خطا در ذخیره اطلاعات'; err.style.display = ''; return; }
+    modal.close('profileModal');
+    toast('اطلاعات با موفقیت ذخیره شد');
+    loadIdCard();
+  } catch (e) {
+    btnLoading(btn, false);
+    err.textContent = 'خطا در ارتباط با سرور'; err.style.display = '';
+  }
+}
+</script>
+{% endif %}
+
+{% if user.role == 'admin' %}
+<script>
+(function(){
+  function fmt(n){return Number(n||0).toLocaleString();}
+  function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+  function timeAgo(iso){
+    var d=new Date(iso), diff=(Date.now()-d.getTime())/1000;
+    if(diff<60)return 'همین الان';
+    if(diff<3600)return Math.floor(diff/60)+' دقیقه پیش';
+    if(diff<86400)return Math.floor(diff/3600)+' ساعت پیش';
+    return Math.floor(diff/86400)+' روز پیش';
+  }
+  var ICONS={
+    ok:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+    proj:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>',
+    money:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+    warn:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+    scale:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M5 7l-3 6a4 4 0 008 0l-3-6M19 7l-3 6a4 4 0 008 0l-3-6M5 7h4M15 7h4M3 21h18"/></svg>',
+    swap:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>',
+    swap16:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>',
+    ticket:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>',
+    ticket16:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>',
+    form:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 12h6m-6 4h4M9 8h6M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>',
+    activity:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>'
+  };
+
+  var TICKET_STATUS_LBL={open:'باز',in_progress:'در حال بررسی',waiting:'در انتظار',resolved:'حل‌شده',closed:'بسته'};
+  var TICKET_STATUS_CLS={open:'b-warn',in_progress:'b-info',waiting:'b-warn',resolved:'b-ok',closed:'b-off'};
+  var TRANSFER_STATUS_LBL={pending:'در انتظار',awaiting_docs:'در انتظار مدارک',approved:'تأیید شده',completed:'تکمیل‌شده',rejected:'رد شده'};
+  var TRANSFER_STATUS_CLS={pending:'b-warn',awaiting_docs:'b-warn',approved:'b-info',completed:'b-ok',rejected:'b-bad'};
+  var FORM_STATUS_LBL={draft:'پیش‌نویس',published:'منتشر شده',archived:'بایگانی'};
+  var FORM_STATUS_CLS={draft:'b-off',published:'b-ok',archived:'b-off'};
+
+  function recentBox(title, icon, seeAllHref, items, rowsHtml){
+    return '<div class="recent-box">'+
+      '<div class="recent-box-hdr"><span class="recent-box-title">'+icon+' '+title+'</span>'+
+      '<a class="recent-box-link" href="'+seeAllHref+'">مشاهده همه</a></div>'+
+      '<div class="recent-box-body">'+
+      (items.length ? rowsHtml : '<div class="recent-empty">موردی وجود ندارد</div>')+
+      '</div></div>';
+  }
+
+  function renderRecent(d){
+    var tickets=d.recent_tickets||[], transfers=d.recent_transfers||[], forms=d.recent_forms||[];
+
+    var ticketsHtml=tickets.map(function(t){
+      return '<a class="recent-row" href="/dashboard/tickets">'+
+        '<span class="recent-row-icon">'+ICONS.ticket16+'</span>'+
+        '<div class="recent-row-body"><div class="recent-row-title">#'+t.number+' — '+esc(t.subject)+'</div>'+
+        '<div class="recent-row-meta">'+timeAgo(t.updated_at)+'</div></div>'+
+        '<span class="badge '+(TICKET_STATUS_CLS[t.status]||'b-off')+'">'+(TICKET_STATUS_LBL[t.status]||t.status)+'</span></a>';
+    }).join('');
+
+    var transfersHtml=transfers.map(function(r){
+      return '<a class="recent-row" href="/dashboard/requests">'+
+        '<span class="recent-row-icon">'+ICONS.swap16+'</span>'+
+        '<div class="recent-row-body"><div class="recent-row-title">'+esc(r.new_owner_full_name||'—')+'</div>'+
+        '<div class="recent-row-meta">'+timeAgo(r.created_at)+'</div></div>'+
+        '<span class="badge '+(TRANSFER_STATUS_CLS[r.status]||'b-off')+'">'+(TRANSFER_STATUS_LBL[r.status]||r.status)+'</span></a>';
+    }).join('');
+
+    var formsHtml=forms.map(function(f){
+      return '<a class="recent-row" href="/dashboard/forms/'+f.id+'/submissions">'+
+        '<span class="recent-row-icon">'+ICONS.form+'</span>'+
+        '<div class="recent-row-body"><div class="recent-row-title">'+esc(f.title)+'</div>'+
+        '<div class="recent-row-meta">'+f.submission_count+' پاسخ &nbsp;·&nbsp; '+timeAgo(f.updated_at)+'</div></div>'+
+        '<span class="badge '+(FORM_STATUS_CLS[f.status]||'b-off')+'">'+(FORM_STATUS_LBL[f.status]||f.status)+'</span></a>';
+    }).join('');
+
+    document.getElementById('ovRecent').innerHTML =
+      recentBox('تیکت‌های اخیر', ICONS.ticket16, '/dashboard/tickets', tickets, ticketsHtml) +
+      recentBox('نقل و انتقال‌های اخیر', ICONS.swap16, '/dashboard/requests', transfers, transfersHtml) +
+      recentBox('فرم‌های اخیر', ICONS.form, '/dashboard/forms', forms, formsHtml);
+  }
+
+  fetch('/api/overview').then(function(r){return r.ok?r.json():null;}).then(function(d){
+    if(!d){ document.getElementById('ovCards').innerHTML='<div class="card card-p" style="grid-column:1/-1;color:var(--muted)">خطا در بارگذاری نمای کلی</div>'; return; }
+    var cards=[
+      {icon:ICONS.ok,cls:'',label:'اعضای فعال',val:fmt(d.members.active),sub:'از '+fmt(d.members.total)+' عضو',href:'/dashboard/members'},
+      {icon:ICONS.proj,cls:'',label:'پروژه‌های فعال',val:fmt(d.projects.active),sub:fmt(d.projects.booklets)+' دفترچه',href:'/dashboard/projects'},
+      {icon:ICONS.money,cls:'ok',label:'وصولی این ماه',val:fmt(d.this_month.collected),sub:'واریزی: '+fmt(d.this_month.deposited)+' ریال',href:'/dashboard/accounting'},
+      {icon:ICONS.warn,cls:d.overdue.count?'bad':'',label:'اقساط معوق',val:fmt(d.overdue.count),sub:fmt(d.overdue.amount)+' ریال',href:'/dashboard/finance',valCls:d.overdue.count?'bad':''},
+      {icon:ICONS.scale,cls:'gold',label:'موجودی کل',val:fmt(d.balance.net),sub:'واریزی − هزینه',href:'/dashboard/accounting'},
+    ];
+    document.getElementById('ovCards').innerHTML=cards.map(function(c){
+      return '<a class="kpi-card" href="'+c.href+'">'+
+        '<div class="kpi-top"><span class="kpi-label">'+c.label+'</span><span class="kpi-icon '+c.cls+'">'+c.icon+'</span></div>'+
+        '<div class="kpi-value'+(c.valCls?' '+c.valCls:'')+'">'+c.val+'</div>'+
+        '<div class="kpi-sub">'+c.sub+'</div></a>';
+    }).join('');
+
+    var pend=[];
+    if(d.pending.transfers)pend.push({t:'درخواست نقل و انتقال در انتظار',n:d.pending.transfers,href:'/dashboard/requests',icon:ICONS.swap});
+    if(d.pending.tickets)pend.push({t:'تیکت باز پشتیبانی',n:d.pending.tickets,href:'/dashboard/tickets',icon:ICONS.ticket});
+    if(pend.length){
+      document.getElementById('ovPending').innerHTML='<div class="pending-strip">'+pend.map(function(p){
+        return '<a href="'+p.href+'" class="pending-card"><span class="pending-icon">'+p.icon+'</span>'+
+          '<div><div class="pending-count">'+p.n+'</div><div class="pending-text">'+p.t+'</div></div></a>';
+      }).join('')+'</div>';
+    }
+
+    renderRecent(d);
+  }).catch(function(){
+    document.getElementById('ovCards').innerHTML='<div class="card card-p" style="grid-column:1/-1;color:var(--muted)">خطا در ارتباط با سرور</div>';
+    document.getElementById('ovRecent').innerHTML='<div class="card card-p" style="grid-column:1/-1;color:var(--muted)">خطا در ارتباط با سرور</div>';
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

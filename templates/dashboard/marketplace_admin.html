@@ -1,0 +1,303 @@
+{% extends "dashboard/layout.html" %}
+{% block head %}
+<style>
+.settings-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; align-items:start; }
+.settings-card-title { font-size:13.5px; font-weight:700; margin:0 0 10px; color:var(--navy); display:flex; align-items:center; gap:6px; }
+.settings-card-hint { font-size:11.5px; color:var(--muted); margin:0 0 12px; line-height:1.7; }
+.settings-save-bar { margin-top:16px; padding:14px 16px; background:var(--card); border:1px solid var(--border); border-radius:var(--r2); display:flex; align-items:center; justify-content:flex-end; gap:10px; box-shadow:var(--sh-s); }
+@media (max-width: 860px) {
+  .settings-grid { grid-template-columns:1fr; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">بازار خرید و فروش دفترچه‌ها</h1>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-pane="listings">مدیریت آگهی‌ها</button>
+  <button class="tab" data-pane="settings">تنظیمات بازار</button>
+</div>
+
+<div id="pane-listings" class="tab-pane active">
+  <div id="statsGrid" class="kpi-grid" style="margin-bottom:24px">
+    {% for i in range(8) %}<div class="skeleton kpi-skel"></div>{% endfor %}
+  </div>
+
+  <div class="row-gap" style="margin-bottom:14px;flex-wrap:wrap">
+    <select class="input" id="statusFilter" style="width:auto" onchange="loadListings(1)">
+      <option value="">همه وضعیت‌ها</option>
+      <option value="waiting_payment">در انتظار پرداخت</option>
+      <option value="payment_review">در حال بررسی پرداخت</option>
+      <option value="admin_review">در انتظار بررسی نهایی</option>
+      <option value="published">منتشرشده</option>
+      <option value="rejected">رد شده</option>
+      <option value="expired">منقضی‌شده</option>
+      <option value="sold">فروخته‌شده</option>
+      <option value="cancelled">لغوشده</option>
+      <option value="disabled">غیرفعال</option>
+    </select>
+  </div>
+
+  <div id="listWrap" class="stagger"></div>
+  <div id="pager" style="display:flex;justify-content:center;gap:6px;margin-top:16px"></div>
+</div>
+
+<div id="pane-settings" class="tab-pane">
+  <div class="settings-grid">
+    <div class="card card-p">
+      <h3 class="settings-card-title">وضعیت بازار</h3>
+      <div class="field"><label>فعال بودن بازار خرید و فروش</label>
+        <select class="input" id="st_enabled"><option value="1">فعال</option><option value="0">غیرفعال</option></select>
+      </div>
+      <div class="field" style="margin-bottom:0"><label>امکان ارسال درخواست خرید توسط مهمان (بدون حساب کاربری)</label>
+        <select class="input" id="st_guest"><option value="1">فعال</option><option value="0">غیرفعال</option></select>
+      </div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">هزینه ثبت آگهی</h3>
+      <p class="settings-card-hint">تغییر این مبلغ فقط روی آگهی‌های جدید اثر می‌گذارد — آگهی‌های قبلی مبلغ ثبت‌شده هنگام ایجادشان را حفظ می‌کنند.</p>
+      <div class="field"><label>هزینه ثبت و انتشار آگهی فعال باشد؟</label>
+        <select class="input" id="st_fee_enabled"><option value="1">فعال (پرداخت الزامی)</option><option value="0">غیرفعال (رایگان)</option></select>
+      </div>
+      <div class="field" style="margin-bottom:0"><label>مبلغ هزینه ثبت آگهی (تومان)</label><input class="input" type="text" inputmode="numeric" id="st_fee_amount" data-amount oninput="fmtAmt(this)"></div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">اعتبار و پرداخت</h3>
+      <div class="field"><label>مدت اعتبار آگهی (روز)</label><input class="input" type="number" id="st_days"></div>
+      <div class="field" style="margin-bottom:0"><label>اطلاعات حساب/کارت برای پرداخت هزینه</label>
+        <textarea class="input" id="st_payment_info" rows="3" placeholder="شماره کارت / شبا و نام صاحب حساب"></textarea>
+      </div>
+    </div>
+
+    <div class="card card-p">
+      <h3 class="settings-card-title">آپلود فیش</h3>
+      <div class="field" style="margin-bottom:0"><label>حداکثر حجم فایل فیش (مگابایت)</label><input class="input" type="number" id="st_max_mb"></div>
+    </div>
+  </div>
+  <div class="settings-save-bar">
+    <button class="btn btn-navy" onclick="saveSettings(this)">ذخیره تنظیمات</button>
+  </div>
+</div>
+
+<!-- Modal: جزئیات آگهی -->
+<div class="modal" id="detailModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-head"><span class="modal-title">جزئیات آگهی</span><button class="modal-x" onclick="modal.close('detailModal')">×</button></div>
+    <div class="modal-body" id="detailBody">در حال بارگذاری…</div>
+  </div>
+</div>
+
+<!-- Modal: دلیل رد -->
+<div class="modal" id="rejectModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-head"><span class="modal-title" id="rejectTitle">دلیل رد</span><button class="modal-x" onclick="modal.close('rejectModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:0"><label>دلیل رد (الزامی)</label><textarea class="input" id="rejectReason" rows="3"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-navy" onclick="confirmReject(this)">ثبت رد</button>
+      <button class="btn btn-ghost" onclick="modal.close('rejectModal')">انصراف</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.tabs .tab').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    if (btn.dataset.pane === 'settings') loadSettings();
+  });
+});
+
+var STATUS_LBL = {
+  draft: 'پیش‌نویس', waiting_payment: 'در انتظار پرداخت', payment_review: 'در حال بررسی پرداخت',
+  admin_review: 'در انتظار بررسی نهایی', published: 'منتشرشده', rejected: 'رد شده',
+  expired: 'منقضی‌شده', sold: 'فروخته‌شده', cancelled: 'لغوشده', disabled: 'غیرفعال',
+};
+var STATUS_CLS = {
+  draft: 'b-off', waiting_payment: 'b-warn', payment_review: 'b-warn',
+  admin_review: 'b-info', published: 'b-ok', rejected: 'b-bad',
+  expired: 'b-off', sold: 'b-ok', cancelled: 'b-off', disabled: 'b-off',
+};
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&lt;','<':'&lt;','>':'&gt;'}[c];}); }
+function fmt(n){ return Number(n||0).toLocaleString(); }
+var curPage = 1;
+
+function loadStats(){
+  fetch('/api/marketplace/admin/stats').then(function(r){return r.json();}).then(function(d){
+    var cards = [
+      {label:'کل آگهی‌ها', val: d.total},
+      {label:'منتشرشده', val: d.published, cls:'ok'},
+      {label:'در انتظار بررسی', val: d.pending_review, cls:'gold'},
+      {label:'در انتظار بررسی پرداخت', val: d.pending_payment_review, cls:'gold'},
+      {label:'فروخته‌شده', val: d.sold},
+      {label:'منقضی‌شده', val: d.expired},
+      {label:'رد شده', val: d.rejected, cls:'bad'},
+      {label:'درخواست‌های خرید', val: d.purchase_requests},
+      {label:'درآمد ثبت آگهی (تومان)', val: fmt(d.revenue), cls:'gold'},
+    ];
+    document.getElementById('statsGrid').innerHTML = cards.map(function(c){
+      return '<div class="kpi-card" style="cursor:default"><div class="kpi-top"><span class="kpi-label">'+c.label+'</span></div>'+
+        '<div class="kpi-value'+(c.cls?' '+c.cls:'')+'">'+c.val+'</div></div>';
+    }).join('');
+  });
+}
+
+function loadListings(page){
+  curPage = page || 1;
+  var status = document.getElementById('statusFilter').value;
+  fetch('/api/marketplace/admin/listings?page='+curPage+(status?'&status='+status:''))
+    .then(function(r){return r.json();}).then(function(d){
+      var wrap = document.getElementById('listWrap');
+      if(!d.listings.length){
+        wrap.innerHTML = '<div class="empty"><div class="empty-icon">🏬</div>آگهی‌ای یافت نشد</div>';
+        document.getElementById('pager').innerHTML = '';
+        return;
+      }
+      wrap.innerHTML = d.listings.map(function(l){
+        return '<div class="card card-p" style="margin-bottom:10px;cursor:pointer" onclick="openDetail('+l.id+')">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
+            '<div>'+
+              '<div style="display:flex;align-items:center;gap:8px"><b>'+esc(l.title)+'</b>'+
+                '<span class="badge '+(STATUS_CLS[l.status]||'b-off')+'">'+(STATUS_LBL[l.status]||l.status)+'</span></div>'+
+              '<div style="font-size:12px;color:var(--muted)">'+l.code+' — فروشنده: '+esc(l.seller_name)+' — '+fmt(l.price)+' تومان</div>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+      var pager = document.getElementById('pager');
+      pager.innerHTML = '';
+      for (var p=1; p<=d.pages; p++){
+        var b = document.createElement('button');
+        b.className = 'btn btn-sm ' + (p===d.page?'btn-navy':'btn-ghost');
+        b.textContent = p;
+        b.onclick = (function(pp){ return function(){ loadListings(pp); }; })(p);
+        pager.appendChild(b);
+      }
+    });
+}
+
+function openDetail(id){
+  modal.open('detailModal');
+  var body = document.getElementById('detailBody');
+  body.innerHTML = 'در حال بارگذاری…';
+  fetch('/api/marketplace/admin/listings/'+id).then(function(r){return r.json();}).then(function(d){
+    var l = d.listing;
+    var actions = '';
+    if (l.status === 'payment_review') {
+      actions += '<button class="btn btn-navy btn-sm" onclick="approvePayment('+l.id+')">تأیید پرداخت</button>'+
+        '<button class="btn btn-ghost btn-sm" style="color:var(--bad)" onclick="openReject(\'payment\','+l.id+')">رد پرداخت</button>';
+    }
+    if (l.status === 'admin_review') {
+      actions += '<button class="btn btn-gold btn-sm" onclick="approveListing('+l.id+')">تأیید و انتشار آگهی</button>'+
+        '<button class="btn btn-ghost btn-sm" style="color:var(--bad)" onclick="openReject(\'listing\','+l.id+')">رد آگهی</button>';
+    }
+    if (l.status === 'published') {
+      actions += '<button class="btn btn-ghost btn-sm" style="color:var(--bad)" onclick="openReject(\'listing\','+l.id+')">رد/جمع‌آوری آگهی</button>';
+    }
+    if (['published','admin_review','waiting_payment','payment_review'].indexOf(l.status) > -1) {
+      actions += '<button class="btn btn-ghost btn-sm" onclick="disableListing('+l.id+')">غیرفعال‌سازی</button>';
+    }
+
+    var receiptHtml = l.payment_receipt_path
+      ? '<a href="/uploads/'+l.payment_receipt_path+'" target="_blank">مشاهده فیش پرداخت</a> — تاریخ: '+esc(l.payment_date)+(l.payment_tracking_code?' — پیگیری: '+esc(l.payment_tracking_code):'')
+      : '—';
+
+    body.innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:14px">'+
+        '<div><b>عنوان:</b> '+esc(l.title)+'</div>'+
+        '<div><b>کد آگهی:</b> '+l.code+'</div>'+
+        '<div><b>فروشنده:</b> '+esc(l.seller_name)+'</div>'+
+        '<div><b>دفترچه:</b> '+esc(l.booklet_code)+'</div>'+
+        '<div><b>پروژه:</b> '+esc(l.project_name)+'</div>'+
+        '<div><b>قیمت:</b> '+fmt(l.price)+' تومان</div>'+
+        '<div><b>وضعیت:</b> <span class="badge '+(STATUS_CLS[l.status]||'b-off')+'">'+(STATUS_LBL[l.status]||l.status)+'</span></div>'+
+        '<div><b>هزینه ثبت:</b> '+(l.fee_required ? fmt(l.fee_amount)+' تومان' : 'رایگان')+'</div>'+
+        '<div style="grid-column:1/-1"><b>شماره تماس:</b> '+esc(l.contact_phone||'—')+' ('+l.contact_method+')</div>'+
+        '<div style="grid-column:1/-1"><b>فیش پرداخت:</b> '+receiptHtml+'</div>'+
+        (l.description ? '<div style="grid-column:1/-1"><b>توضیحات:</b> '+esc(l.description)+'</div>' : '')+
+      '</div>'+
+      '<div class="row-gap" style="flex-wrap:wrap;margin-bottom:16px">'+actions+'</div>'+
+      '<h4 style="font-size:13px;font-weight:800;margin-bottom:8px">درخواست‌های خرید ('+d.purchase_requests.length+')</h4>'+
+      (d.purchase_requests.length ? d.purchase_requests.map(function(r){
+        return '<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)">'+esc(r.buyer_name)+' — '+esc(r.buyer_phone)+'</div>';
+      }).join('') : '<div style="font-size:12.5px;color:var(--muted)">درخواستی ثبت نشده</div>')+
+      '<h4 style="font-size:13px;font-weight:800;margin:16px 0 8px">تاریخچه تغییرات</h4>'+
+      (d.history.length ? d.history.map(function(h){
+        return '<div style="font-size:12px;color:var(--muted);padding:4px 0">'+esc(h.detail)+' — '+esc(h.user)+'</div>';
+      }).join('') : '<div style="font-size:12px;color:var(--muted)">—</div>');
+  });
+}
+
+function approvePayment(id){
+  fetch('/api/marketplace/admin/listings/'+id+'/approve-payment', {method:'POST'}).then(function(r){
+    if(r.ok){ toast('پرداخت تأیید شد'); openDetail(id); loadListings(curPage); loadStats(); } else { toast('خطا', 'warn'); }
+  });
+}
+function approveListing(id){
+  fetch('/api/marketplace/admin/listings/'+id+'/approve', {method:'POST'}).then(function(r){
+    if(r.ok){ toast('آگهی منتشر شد'); openDetail(id); loadListings(curPage); loadStats(); } else { toast('خطا', 'warn'); }
+  });
+}
+function disableListing(id){
+  confirmAction('این آگهی غیرفعال شود؟').then(function(ok){
+    if(!ok) return;
+    fetch('/api/marketplace/admin/listings/'+id+'/disable', {method:'POST'}).then(function(r){
+      if(r.ok){ toast('غیرفعال شد'); openDetail(id); loadListings(curPage); loadStats(); }
+    });
+  });
+}
+
+var rejectCtx = {type:null, id:null};
+function openReject(type, id){
+  rejectCtx = {type:type, id:id};
+  document.getElementById('rejectReason').value = '';
+  document.getElementById('rejectTitle').textContent = type==='payment' ? 'دلیل رد پرداخت' : 'دلیل رد آگهی';
+  modal.open('rejectModal');
+}
+function confirmReject(btn){
+  var reason = document.getElementById('rejectReason').value.trim();
+  if(!reason){ toast('دلیل رد الزامی است', 'warn'); return; }
+  var url = '/api/marketplace/admin/listings/'+rejectCtx.id+'/'+(rejectCtx.type==='payment'?'reject-payment':'reject');
+  btnLoading(btn, true);
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason:reason})})
+    .then(function(r){ btnLoading(btn,false); if(r.ok){ toast('ثبت شد'); modal.close('rejectModal'); openDetail(rejectCtx.id); loadListings(curPage); loadStats(); } else { toast('خطا', 'warn'); } });
+}
+
+function loadSettings(){
+  fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(d){
+    document.getElementById('st_enabled').value = d.marketplace_enabled || '1';
+    document.getElementById('st_guest').value = d.marketplace_allow_guest_requests || '1';
+    document.getElementById('st_fee_enabled').value = d.marketplace_fee_enabled || '1';
+    var feeEl = document.getElementById('st_fee_amount');
+    feeEl.value = d.marketplace_fee_amount || '260000';
+    fmtAmt(feeEl);
+    document.getElementById('st_days').value = d.marketplace_listing_days || '30';
+    document.getElementById('st_payment_info').value = d.marketplace_payment_info || '';
+    document.getElementById('st_max_mb').value = d.marketplace_max_receipt_mb || '5';
+  });
+}
+function saveSettings(btn){
+  btnLoading(btn, true);
+  fetch('/api/admin/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+    marketplace_enabled: document.getElementById('st_enabled').value,
+    marketplace_allow_guest_requests: document.getElementById('st_guest').value,
+    marketplace_fee_enabled: document.getElementById('st_fee_enabled').value,
+    marketplace_fee_amount: getRawAmt(document.getElementById('st_fee_amount')),
+    marketplace_listing_days: document.getElementById('st_days').value,
+    marketplace_payment_info: document.getElementById('st_payment_info').value,
+    marketplace_max_receipt_mb: document.getElementById('st_max_mb').value,
+  })}).then(function(r){
+    btnLoading(btn, false);
+    if(r.ok){ toast('تنظیمات ذخیره شد'); } else { toast('خطا در ذخیره', 'warn'); }
+  });
+}
+
+loadStats();
+loadListings(1);
+</script>
+{% endblock %}

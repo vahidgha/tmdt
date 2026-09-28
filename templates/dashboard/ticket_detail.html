@@ -1,0 +1,143 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <div>
+    <a href="/dashboard/tickets" style="font-size:13px;color:var(--muted)">← تیکت‌ها</a>
+    <h1 class="pg-title" id="tkSubject">در حال بارگذاری…</h1>
+  </div>
+  <div style="display:flex;gap:8px" id="tkActions"></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start" id="tkLayout">
+  <!-- Messages -->
+  <div>
+    <div id="messages" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px"></div>
+
+    <!-- Reply box -->
+    <div class="card" id="replyBox" style="padding:16px">
+      <div class="field"><label>پاسخ *</label>
+        <textarea class="input" id="replyBody" rows="4" placeholder="متن پاسخ خود را بنویسید…"></textarea>
+      </div>
+      {% if user.role == 'admin' %}
+      <div class="field">
+        <label>تغییر وضعیت</label>
+        <select class="input" id="replyStatus">
+          <option value="">بدون تغییر</option>
+          <option value="in_progress">در حال بررسی</option>
+          <option value="waiting">منتظر پاسخ کاربر</option>
+          <option value="resolved">حل شده</option>
+          <option value="closed">بسته</option>
+        </select>
+      </div>
+      {% endif %}
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-navy" onclick="sendReply(this)">ارسال پاسخ</button>
+        <a href="/dashboard/tickets" class="btn btn-ghost">برگشت</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar info -->
+  <div class="card" style="padding:16px">
+    <div style="font-weight:600;margin-bottom:12px;font-size:14px">اطلاعات تیکت</div>
+    <div id="tkMeta" style="font-size:13px;display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<style>
+.msg-bubble{padding:12px 16px;border-radius:12px;max-width:85%;font-size:14px;line-height:1.6}
+.msg-admin{background:var(--navy,#0E1B32);color:#fff;align-self:flex-start}
+.msg-user{background:var(--card);border:1px solid var(--border);align-self:flex-end}
+.msg-wrap{display:flex;flex-direction:column}
+.msg-meta{font-size:11px;opacity:.6;margin-top:4px}
+.meta-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
+.meta-row:last-child{border-bottom:none}
+.meta-label{color:var(--muted)}
+</style>
+
+<script>
+const TK_ID = {{ ticket_id }};
+const IS_ADMIN = {{ 'true' if user.role == 'admin' else 'false' }};
+let ticket = null;
+
+const STATUS_LABEL = {open:'باز',in_progress:'در حال بررسی',waiting:'منتظر پاسخ',resolved:'حل‌شده',closed:'بسته'};
+const PRIO_LABEL   = {low:'پایین',normal:'معمولی',high:'بالا',urgent:'فوری'};
+const CAT_LABEL    = {financial:'مالی',transfer:'نقل و انتقال',technical:'فنی',general:'عمومی',marketplace:'بازار خرید و فروش'};
+
+async function loadTicket(){
+  const r = await fetch(`/api/tickets/${TK_ID}`);
+  if(!r.ok){ document.getElementById('tkSubject').textContent='تیکت یافت نشد'; return; }
+  const d = await r.json();
+  ticket   = d.ticket;
+  renderHeader();
+  renderMessages(d.messages||[]);
+  renderMeta();
+  if(ticket.status==='closed') document.getElementById('replyBox').style.display='none';
+}
+
+function renderHeader(){
+  document.getElementById('tkSubject').textContent=`#${ticket.number} — ${ticket.subject}`;
+  if(IS_ADMIN){
+    document.getElementById('tkActions').innerHTML=`
+      <span class="badge">${STATUS_LABEL[ticket.status]||ticket.status}</span>
+      <button class="btn btn-sm btn-ghost" onclick="closeTicket()">بستن تیکت</button>
+    `;
+  }
+}
+
+function renderMessages(msgs){
+  const el = document.getElementById('messages');
+  if(!msgs.length){ el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px">پیامی وجود ندارد</div>'; return; }
+  el.innerHTML = msgs.map(m=>`
+    <div class="msg-wrap" style="align-items:${m.is_admin?'flex-start':'flex-end'}">
+      <div class="msg-bubble ${m.is_admin?'msg-admin':'msg-user'}">
+        ${esc(m.body).replace(/\n/g,'<br>')}
+      </div>
+      <div class="msg-meta" style="text-align:${m.is_admin?'left':'right'}">
+        ${esc(m.sender_name)} · ${new Date(m.created_at).toLocaleDateString('fa-IR',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+      </div>
+    </div>
+  `).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderMeta(){
+  const t = ticket;
+  document.getElementById('tkMeta').innerHTML=`
+    <div class="meta-row"><span class="meta-label">شماره</span><span>#${t.number}</span></div>
+    <div class="meta-row"><span class="meta-label">وضعیت</span><span class="badge">${STATUS_LABEL[t.status]||t.status}</span></div>
+    <div class="meta-row"><span class="meta-label">اولویت</span><span>${PRIO_LABEL[t.priority]||t.priority}</span></div>
+    <div class="meta-row"><span class="meta-label">دسته</span><span>${CAT_LABEL[t.category]||t.category}</span></div>
+    <div class="meta-row"><span class="meta-label">ایجادکننده</span><span>${esc(t.creator_name)}</span></div>
+    <div class="meta-row"><span class="meta-label">تاریخ ثبت</span><span>${new Date(t.created_at).toLocaleDateString('fa-IR')}</span></div>
+    ${t.closed_at?`<div class="meta-row"><span class="meta-label">تاریخ بسته</span><span>${new Date(t.closed_at).toLocaleDateString('fa-IR')}</span></div>`:''}
+  `;
+}
+
+async function sendReply(btn){
+  const body = document.getElementById('replyBody').value.trim();
+  if(!body){ showToast('متن پاسخ الزامی است','error'); return; }
+  btn.disabled=true; btn.textContent='در حال ارسال…';
+  const payload = {body};
+  const statusEl = document.getElementById('replyStatus');
+  if(statusEl && statusEl.value) payload.status = statusEl.value;
+  const r = await fetch(`/api/tickets/${TK_ID}/reply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d = await r.json();
+  if(r.ok){
+    document.getElementById('replyBody').value='';
+    if(statusEl) statusEl.value='';
+    showToast('پاسخ ارسال شد');
+    loadTicket();
+  } else showToast(d.error||'خطا','error');
+  btn.disabled=false; btn.textContent='ارسال پاسخ';
+}
+
+async function closeTicket(){
+  if(!confirm('تیکت بسته شود؟')) return;
+  const r = await fetch(`/api/tickets/${TK_ID}/status`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'closed'})});
+  if(r.ok){ loadTicket(); showToast('تیکت بسته شد'); }
+}
+
+loadTicket();
+</script>
+{% endblock %}

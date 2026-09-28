@@ -1,0 +1,88 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto">
+  <div class="card card-p">
+    <h2 style="font-size:17px;font-weight:900;margin-bottom:6px">تکمیل اطلاعات هویتی</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:22px">پیش از دسترسی به سامانه اطلاعات زیر را تکمیل کنید.</p>
+    <div id="err" class="alert alert-bad" style="display:none"></div>
+    <div class="grid-2">
+      <div class="field"><label>نام *</label><input class="input" id="f_fn" placeholder="نام"></div>
+      <div class="field"><label>نام خانوادگی *</label><input class="input" id="f_ln" placeholder="نام خانوادگی"></div>
+      <div class="field"><label>نام پدر *</label><input class="input" id="f_fa"></div>
+      <div class="field"><label>تاریخ تولد *</label><input class="input" id="f_bd" placeholder="۱۳۷۰/۰۱/۰۱" data-jdp></div>
+      <div class="field"><label>محل تولد *</label>
+        <select class="input" id="f_bp">
+          <option value="">— انتخاب استان —</option>
+          {% for p in ['آذربایجان شرقی','آذربایجان غربی','اردبیل','اصفهان','البرز','ایلام','بوشهر','تهران','چهارمحال و بختیاری','خراسان جنوبی','خراسان رضوی','خراسان شمالی','خوزستان','زنجان','سمنان','سیستان و بلوچستان','فارس','قزوین','قم','کردستان','کرمان','کرمانشاه','کهگیلویه و بویراحمد','گلستان','گیلان','لرستان','مازندران','مرکزی','هرمزگان','همدان','یزد'] %}
+          <option>{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label>وضعیت تأهل *</label>
+        <select class="input" id="f_ms"><option value="">— انتخاب —</option><option>مجرد</option><option>متأهل</option></select>
+      </div>
+      <div class="field"><label>شغل *</label><input class="input" id="f_occ"></div>
+      <div class="field"><label>موبایل *</label><input class="input" id="f_ph" placeholder="09xxxxxxxxx"></div>
+      <div class="field"><label>تماس ضروری *</label><input class="input" id="f_em"></div>
+      <div class="field"><label>تلفن ثابت</label><input class="input" id="f_ll"></div>
+      <div class="field"><label>کد پستی *</label><input class="input mono" id="f_pc"></div>
+      <div class="field"><label>ایمیل</label><input class="input" id="f_ml"></div>
+    </div>
+    <div class="field"><label>آدرس کامل *</label><textarea class="input" id="f_addr" rows="3"></textarea></div>
+    <div class="grid-2" style="margin-top:4px">
+      <div class="field"><label>نام بانک *</label><input class="input" id="f_bk"></div>
+      <div class="field"><label>شماره حساب</label><input class="input mono" id="f_acc"></div>
+      <div class="field"><label>شماره شبا</label><input class="input mono" id="f_ib" placeholder="IR"></div>
+    </div>
+    <div class="grid-2" style="border-top:1px solid var(--border);padding-top:16px;margin-top:10px">
+      <div class="field"><label>رمز عبور جدید <span style="color:var(--muted);font-weight:400">(اختیاری — بعداً هم از پنل قابل تغییر است)</span></label><input type="password" class="input" id="f_pw"></div>
+      <div class="field"><label>تکرار رمز</label><input type="password" class="input" id="f_pw2"></div>
+    </div>
+    <button class="btn btn-navy btn-block btn-lg" style="margin-top:16px" onclick="submit(this)">
+      تکمیل و ورود به سامانه
+    </button>
+  </div>
+</div>
+
+
+
+{% endblock %}
+{% block scripts %}
+<script>
+window.submit = async function(btn) {
+  const err = document.getElementById('err'); err.style.display = 'none';
+
+  const required = [
+    ['f_fn','نام'], ['f_ln','نام خانوادگی'], ['f_fa','نام پدر'], ['f_bd','تاریخ تولد'],
+    ['f_bp','محل تولد'], ['f_ms','وضعیت تأهل'], ['f_occ','شغل'], ['f_ph','موبایل'],
+    ['f_em','تماس ضروری'], ['f_pc','کد پستی'], ['f_addr','آدرس کامل'], ['f_bk','نام بانک'],
+  ];
+  const missing = required.filter(function(f){ return !$v(f[0]); });
+  if (missing.length) {
+    err.textContent = 'لطفاً فیلدهای الزامی را تکمیل کنید: ' + missing.map(function(f){return f[1];}).join('، ');
+    err.style.display = '';
+    return;
+  }
+  if ($v('f_pw') && $v('f_pw') !== $v('f_pw2')) {
+    err.textContent = 'رمز عبور جدید و تکرار آن مطابقت ندارند.';
+    err.style.display = '';
+    return;
+  }
+
+  btnLoading(btn, true);
+  const data = {
+    first_name:$v('f_fn'), last_name:$v('f_ln'),
+    father_name:$v('f_fa'), birth_date:$v('f_bd'), birth_place:$v('f_bp'),
+    marital_status:$v('f_ms'), occupation:$v('f_occ'),
+    phone:$v('f_ph'), emergency_phone:$v('f_em'), landline:$v('f_ll'),
+    postal_code:$v('f_pc'), email:$v('f_ml'), address:$v('f_addr'),
+    bank_name:$v('f_bk'), account_number:$v('f_acc'), iban:$v('f_ib'),
+    new_password:$v('f_pw'), confirm_password:$v('f_pw2'),
+  };
+  const r = await fetch('/api/profile/complete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const d = await r.json();
+  btnLoading(btn, false);
+  if (!r.ok) { err.textContent = d.error; err.style.display = ''; return; }
+  location.href = '/dashboard/';
+}
+</script>
+{% endblock %}

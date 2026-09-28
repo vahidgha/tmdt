@@ -1,0 +1,133 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">پرونده اعضا</h1>
+  <div style="display:flex;gap:8px;align-items:center">
+    <select class="input" id="projFilter" onchange="load()" style="max-width:200px">
+      <option value="">همه پروژه‌ها</option>
+    </select>
+    <input class="input" id="searchInp" placeholder="جستجو نام / کد ملی…" oninput="filterTable()" style="max-width:220px">
+  </div>
+</div>
+
+<div id="profilesContainer" class="tbl-wrap">
+  <div class="empty" style="padding:40px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>در حال بارگذاری…</div>
+</div>
+
+<!-- Modal پرونده کامل -->
+<div class="modal" id="profileModal">
+  <div class="modal-box" style="max-width:760px">
+    <div class="modal-head">
+      <span class="modal-title" id="profileModalTitle">پرونده عضو</span>
+      <button class="modal-x" onclick="modal.close('profileModal')">×</button>
+    </div>
+    <div class="modal-body" id="profileModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="modal.close('profileModal')">بستن</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var allMembers = [];
+
+function loadProjects() {
+  fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+    var opts = '<option value="">همه پروژه‌ها</option>' +
+      (d.projects||[]).map(function(p){ return '<option value="'+p.id+'">'+p.name+'</option>'; }).join('');
+    document.getElementById('projFilter').innerHTML = opts;
+  });
+}
+
+function load() {
+  var pid = document.getElementById('projFilter').value;
+  var url = '/api/members' + (pid ? '?project_id='+pid : '');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    allMembers = d.members || [];
+    renderTable(allMembers);
+  });
+}
+
+function filterTable() {
+  var q = document.getElementById('searchInp').value.toLowerCase();
+  if (!q) { renderTable(allMembers); return; }
+  renderTable(allMembers.filter(function(m) {
+    return (m.full_name||'').toLowerCase().includes(q) ||
+      (m.national_code||'').includes(q) ||
+      (m.phone||'').includes(q);
+  }));
+}
+
+function renderTable(members) {
+  var el = document.getElementById('profilesContainer');
+  if (!members.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>عضوی یافت نشد</div>';
+    return;
+  }
+  el.innerHTML = '<table class="tbl"><thead><tr>' +
+    '<th>ردیف</th><th>نام و نام‌خانوادگی</th><th>کد ملی</th><th>موبایل</th>' +
+    '<th>پروژه</th><th>دفترچه</th><th>سهم</th><th>وضعیت</th><th>پرونده</th>' +
+    '</tr></thead><tbody>' +
+    members.map(function(m, i) {
+      var bk = m.booklets && m.booklets[0];
+      var projName = bk ? (bk.project_name || '—') : '—';
+      var bkCode   = bk ? bk.code : '—';
+      var share    = bk ? (bk.share_type === 'full' ? 'تمام‌سهم' : 'نیم‌سهم') : '—';
+      var active   = m.active ? '<span class="badge b-ok">فعال</span>' : '<span class="badge b-off">غیرفعال</span>';
+      return '<tr>' +
+        '<td>' + (i+1) + '</td>' +
+        '<td style="font-weight:700">' + esc(m.full_name||'—') + '</td>' +
+        '<td class="mono">' + esc(m.national_code||'—') + '</td>' +
+        '<td>' + esc(m.phone||'—') + '</td>' +
+        '<td>' + esc(projName) + '</td>' +
+        '<td class="mono">' + esc(bkCode) + '</td>' +
+        '<td>' + share + '</td>' +
+        '<td>' + active + '</td>' +
+        '<td><button class="btn btn-ghost btn-sm" onclick="openProfile(allMembers['+i+'])">مشاهده</button></td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+function openProfile(m) {
+  document.getElementById('profileModalTitle').textContent = 'پرونده: ' + (m.full_name||'—');
+  var bks = m.booklets || [];
+  var rows = [
+    ['نام','first_name'], ['نام خانوادگی','last_name'], ['نام پدر','father_name'],
+    ['کد ملی','national_code'], ['شماره شناسنامه','id_number'], ['تاریخ تولد','birth_date'],
+    ['محل تولد','birth_place'], ['جنسیت','gender'], ['وضعیت تأهل','marital_status'],
+    ['موبایل','phone'], ['تلفن ثابت','landline'], ['موبایل اضطراری','emergency_phone'],
+    ['ایمیل','email'], ['آدرس','address'], ['کد پستی','postal_code'],
+    ['شغل','occupation'], ['بانک','bank_name'], ['شماره حساب','account_number'],
+    ['شماره شبا','iban'],
+  ];
+  var info = rows.map(function(r) {
+    var v = m[r[1]];
+    if (!v) return '';
+    return '<div class="doc-row"><span class="doc-key">'+esc(r[0])+'</span><span class="doc-val">'+esc(v||'—')+'</span></div>';
+  }).join('');
+
+  var bkHtml = bks.length ? bks.map(function(b){
+    return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:8px">' +
+      '<div class="doc-row"><span class="doc-key">کد دفترچه</span><span class="doc-val mono">'+esc(b.code)+'</span></div>' +
+      '<div class="doc-row"><span class="doc-key">پروژه</span><span class="doc-val">'+esc(b.project_name||'—')+'</span></div>' +
+      '<div class="doc-row"><span class="doc-key">سهم</span><span class="doc-val">'+(b.share_type==='full'?'تمام‌سهم':'نیم‌سهم')+'</span></div>' +
+      (b.contract_no?'<div class="doc-row"><span class="doc-key">شماره قرارداد</span><span class="doc-val mono">'+esc(b.contract_no)+'</span></div>':'') +
+      (b.contract_date?'<div class="doc-row"><span class="doc-key">تاریخ قرارداد</span><span class="doc-val">'+esc(b.contract_date)+'</span></div>':'') +
+      (b.contract_amount?'<div class="doc-row"><span class="doc-key">مبلغ قرارداد</span><span class="doc-val">'+Number(b.contract_amount).toLocaleString('fa-IR')+' ریال</span></div>':'') +
+      '</div>';
+  }).join('') : '<div style="color:var(--muted);font-size:13px">دفترچه‌ای ثبت نشده</div>';
+
+  document.getElementById('profileModalBody').innerHTML =
+    '<div class="doc-section"><div class="doc-sec-label">اطلاعات شخصی</div>' + info + '</div>' +
+    '<div class="doc-section" style="margin-top:16px"><div class="doc-sec-label">دفترچه‌ها</div>' + bkHtml + '</div>';
+  modal.open('profileModal');
+}
+
+loadProjects();
+load();
+</script>
+{% endblock %}

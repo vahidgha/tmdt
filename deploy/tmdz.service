@@ -1,0 +1,29 @@
+# systemd service — سامانه تعاونی مسکن
+# نصب:
+#   sudo cp deploy/tmdz.service /etc/systemd/system/tmdz.service
+#   (مسیرها و کاربر را مطابق سرور خود ویرایش کنید)
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tmdz
+#   sudo systemctl status tmdz
+#   journalctl -u tmdz -f          # مشاهده لاگ زنده
+
+[Unit]
+Description=TMDZ Cooperative Housing (Gunicorn)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/tmdz-app
+EnvironmentFile=/home/admin/tmdz-app/.env
+# FLASK_DEBUG هرگز در production ست نشود.
+ExecStart=/home/admin/tmdz-app/env/bin/gunicorn -c gunicorn_conf.py run:app
+Restart=always
+RestartSec=3
+# سخت‌گیری امنیتی سبک
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

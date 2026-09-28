@@ -1,0 +1,219 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <div>
+    <h1 class="pg-title">لاگ فعالیت‌ها</h1>
+    <p class="pg-sub">تمام رویدادهای ثبت‌شده در سامانه</p>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div id="logStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:20px"></div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px;padding:16px 20px">
+  <div style="display:grid;grid-template-columns:1fr repeat(3,minmax(140px,180px)) auto;gap:12px;align-items:end">
+    <div class="field" style="margin:0">
+      <label>جستجو</label>
+      <input type="text" id="logSearch" class="input" placeholder="نام کاربر / جزئیات / IP …" oninput="debouncedLoad()">
+    </div>
+    <div class="field" style="margin:0">
+      <label>دسته‌بندی</label>
+      <select id="logCat" class="input" onchange="load()">
+        <option value="">همه</option>
+        <option value="auth">احراز هویت</option>
+        <option value="member">اعضا</option>
+        <option value="booklet">دفترچه</option>
+        <option value="transfer">نقل و انتقال</option>
+        <option value="finance">مالی</option>
+        <option value="ticket">تیکت</option>
+        <option value="admin">مدیریت</option>
+        <option value="general">عمومی</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0">
+      <label>از تاریخ</label>
+      <input type="date" id="logFrom" class="input" onchange="load()">
+    </div>
+    <div class="field" style="margin:0">
+      <label>تا تاریخ</label>
+      <input type="date" id="logTo" class="input" onchange="load()">
+    </div>
+    <button class="btn btn-ghost" onclick="resetFilters()" style="white-space:nowrap">پاک کردن</button>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card" style="padding:0;overflow:clip">
+  <div class="tbl-wrap" style="border:none;border-radius:0">
+    <table class="tbl" id="logTable">
+      <thead>
+        <tr>
+          <th style="width:60px">#</th>
+          <th style="width:150px">زمان</th>
+          <th>کاربر</th>
+          <th style="width:70px">نقش</th>
+          <th style="width:160px">عملیات</th>
+          <th style="width:110px">دسته</th>
+          <th>جزئیات</th>
+          <th style="width:110px">IP</th>
+        </tr>
+      </thead>
+      <tbody id="logBody">
+        <tr><td colspan="8" style="text-align:center;padding:40px;opacity:.5">در حال بارگذاری…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+<div id="logPager" style="display:flex;justify-content:center;gap:8px;margin-top:16px;flex-wrap:wrap"></div>
+
+<style>
+.log-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
+/* category colors */
+.cat-auth{background:rgba(99,102,241,.15);color:#818cf8}
+.cat-member{background:rgba(16,185,129,.12);color:#10b981}
+.cat-booklet{background:rgba(59,130,246,.12);color:#3b82f6}
+.cat-transfer{background:rgba(245,158,11,.12);color:#f59e0b}
+.cat-finance{background:rgba(34,197,94,.12);color:#22c55e}
+.cat-ticket{background:rgba(168,85,247,.12);color:#a855f7}
+.cat-admin{background:rgba(239,68,68,.12);color:#ef4444}
+.cat-general{background:rgba(107,114,128,.1);color:#9ca3af}
+/* action colors */
+.act-login{background:rgba(16,185,129,.12);color:#10b981}
+.act-logout{background:rgba(107,114,128,.1);color:#6b7280}
+.act-login_fail{background:rgba(239,68,68,.12);color:#ef4444}
+.act-member_create{background:rgba(16,185,129,.12);color:#10b981}
+.act-member_toggle{background:rgba(245,158,11,.12);color:#f59e0b}
+.act-delete_member{background:rgba(239,68,68,.12);color:#ef4444}
+.act-booklet_create{background:rgba(59,130,246,.12);color:#3b82f6}
+.act-booklet_delete{background:rgba(239,68,68,.12);color:#ef4444}
+.act-transfer_request{background:rgba(59,130,246,.12);color:#3b82f6}
+.act-transfer_approve{background:rgba(16,185,129,.12);color:#10b981}
+.act-transfer_reject{background:rgba(239,68,68,.12);color:#ef4444}
+.act-plan_create{background:rgba(34,197,94,.12);color:#22c55e}
+.act-payment_confirm{background:rgba(16,185,129,.12);color:#10b981}
+.act-ticket_create{background:rgba(168,85,247,.12);color:#a855f7}
+.act-ticket_reply{background:rgba(168,85,247,.08);color:#c084fc}
+.act-ticket_status{background:rgba(245,158,11,.12);color:#f59e0b}
+.act-announcement_create{background:rgba(239,68,68,.12);color:#ef4444}
+.act-announcement_update{background:rgba(245,158,11,.12);color:#f59e0b}
+.act-announcement_delete{background:rgba(239,68,68,.15);color:#dc2626}
+.act-project_create{background:rgba(59,130,246,.12);color:#3b82f6}
+.act-project_update{background:rgba(245,158,11,.12);color:#f59e0b}
+.act-project_delete{background:rgba(239,68,68,.12);color:#ef4444}
+.act-notification_send{background:rgba(107,114,128,.12);color:#9ca3af}
+.act-other{background:rgba(107,114,128,.1);color:#9ca3af}
+.stat-mini{background:var(--card-bg,var(--card));border:1px solid var(--border);border-radius:10px;padding:10px 16px;text-align:center}
+.stat-mini .num{font-size:22px;font-weight:700;line-height:1.2;display:block}
+.stat-mini .lbl{font-size:11px;opacity:.6;margin-top:2px;display:block}
+</style>
+
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var currentPage = 1;
+var debTimer = null;
+function debouncedLoad(){ clearTimeout(debTimer); debTimer = setTimeout(load, 400); }
+
+var CAT_FA = {auth:'احراز هویت',member:'اعضا',booklet:'دفترچه',transfer:'نقل و انتقال',
+              finance:'مالی',ticket:'تیکت',admin:'مدیریت',general:'عمومی'};
+var ACT_FA = {
+  login:'ورود',logout:'خروج',login_fail:'ورود ناموفق',
+  member_create:'ثبت عضو',member_toggle:'تغییر وضعیت عضو',delete_member:'حذف عضو',
+  booklet_create:'ثبت دفترچه',booklet_delete:'حذف دفترچه',
+  transfer_request:'درخواست انتقال',transfer_approve:'تأیید انتقال',transfer_reject:'رد انتقال',
+  plan_create:'طرح پرداخت',payment_confirm:'تأیید پرداخت',
+  ticket_create:'ثبت تیکت',ticket_reply:'پاسخ تیکت',ticket_status:'تغییر وضعیت تیکت',
+  announcement_create:'اطلاعیه جدید',announcement_update:'ویرایش اطلاعیه',announcement_delete:'حذف اطلاعیه',
+  project_create:'ثبت پروژه',project_update:'ویرایش پروژه',project_delete:'حذف پروژه',
+  notification_send:'ارسال اعلان',
+};
+
+function resetFilters(){
+  ['logSearch','logFrom','logTo'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('logCat').value='';
+  load();
+}
+
+function load(page){
+  if(page) currentPage=page;
+  var params=new URLSearchParams();
+  params.set('page',currentPage);
+  params.set('per_page',25);
+  var s=document.getElementById('logSearch').value.trim();
+  var c=document.getElementById('logCat').value;
+  var f=document.getElementById('logFrom').value;
+  var t=document.getElementById('logTo').value;
+  if(s) params.set('search',s);
+  if(c) params.set('category',c);
+  if(f) params.set('date_from',f);
+  if(t) params.set('date_to',t);
+
+  fetch('/api/activity-log?'+params.toString())
+    .then(function(r){return r.json();})
+    .then(function(data){
+      renderStats(data);
+      renderRows(data.logs||[]);
+      renderPager(data.page,data.pages);
+    })
+    .catch(function(){
+      document.getElementById('logBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--danger)">خطا در بارگذاری</td></tr>';
+    });
+}
+
+function renderStats(data){
+  var st=data.stats||{};
+  var total=data.total||0;
+  var items=[
+    {label:'کل رویدادها',val:total,color:'#818cf8'},
+    {label:'ورود موفق',val:st.login||0,color:'#10b981'},
+    {label:'ورود ناموفق',val:st.login_fail||0,color:'#ef4444'},
+    {label:'انتقال‌ها',val:st.transfer||0,color:'#f59e0b'},
+    {label:'تیکت‌ها',val:(st.ticket_create||0)+(st.ticket_reply||0)+(st.ticket_status||0),color:'#a855f7'},
+    {label:'مالی',val:(st.plan_create||0)+(st.payment_confirm||0),color:'#22c55e'},
+  ];
+  document.getElementById('logStats').innerHTML=items.map(function(s){
+    return '<div class="stat-mini"><span class="num" style="color:'+s.color+'">'+s.val+'</span><span class="lbl">'+s.label+'</span></div>';
+  }).join('');
+}
+
+function renderRows(items){
+  var tb=document.getElementById('logBody');
+  if(!items.length){
+    tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;opacity:.5">رویدادی یافت نشد</td></tr>';
+    return;
+  }
+  tb.innerHTML=items.map(function(r){
+    var dt=new Date(r.created_at);
+    var dtStr=dt.toLocaleDateString('fa-IR')+' '+dt.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'});
+    var actKey='act-'+(ACT_FA[r.action]?r.action:'other');
+    var catKey='cat-'+(r.category||'general');
+    return '<tr>'+
+      '<td style="opacity:.45;font-size:11px">'+r.id+'</td>'+
+      '<td style="font-size:12px;white-space:nowrap">'+dtStr+'</td>'+
+      '<td style="font-weight:600">'+esc(r.user_name||'—')+'</td>'+
+      '<td><span class="badge '+(r.user_role==='admin'?'b-admin':'b-member')+'" style="font-size:10px;padding:2px 7px">'+(r.user_role==='admin'?'مدیر':'عضو')+'</span></td>'+
+      '<td><span class="log-badge '+actKey+'">'+esc(ACT_FA[r.action]||r.action)+'</span></td>'+
+      '<td><span class="log-badge '+catKey+'">'+esc(CAT_FA[r.category]||r.category||'—')+'</span></td>'+
+      '<td style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.detail||'')+'">'+esc(r.detail||'—')+'</td>'+
+      '<td style="font-size:11px;opacity:.6;font-family:monospace">'+esc(r.ip||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function renderPager(page,pages){
+  var el=document.getElementById('logPager');
+  if(!pages||pages<=1){el.innerHTML='';return;}
+  var html='';
+  if(page>1) html+='<button class="btn btn-ghost" style="padding:6px 14px" onclick="load('+(page-1)+')">قبلی</button>';
+  for(var p=Math.max(1,page-2);p<=Math.min(pages,page+2);p++){
+    html+='<button class="btn '+(p===page?'btn-navy':'btn-ghost')+'" style="padding:6px 12px;min-width:36px" onclick="load('+p+')">'+p+'</button>';
+  }
+  if(page<pages) html+='<button class="btn btn-ghost" style="padding:6px 14px" onclick="load('+(page+1)+')">بعدی</button>';
+  el.innerHTML=html;
+}
+
+load();
+</script>
+{% endblock %}

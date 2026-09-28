@@ -1,0 +1,215 @@
+{% extends "dashboard/layout.html" %}
+{% block content %}
+<div class="pg-hdr">
+  <h1 class="pg-title">گزارش‌ساز</h1>
+  <button class="btn btn-ghost no-print" onclick="window.print()">🖨 چاپ</button>
+</div>
+
+<div class="card card-p no-print" style="margin-bottom:18px">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div class="field" style="margin:0;min-width:180px">
+      <label>نوع گزارش</label>
+      <select class="input" id="rType" onchange="onTypeChange()">
+        <option value="finance">مالی و اقساط</option>
+        <option value="members">لیست اعضا</option>
+        <option value="booklets">دفترچه‌محور</option>
+        <option value="history">تاریخچه انتقال</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0;min-width:180px">
+      <label>پروژه</label>
+      <select class="input" id="rProject">
+        <option value="">همه پروژه‌ها</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0;min-width:140px" id="statusField">
+      <label>وضعیت</label>
+      <select class="input" id="rStatus">
+        <option value="">همه</option>
+        <option value="paid">پرداخت‌شده</option>
+        <option value="unpaid">در انتظار</option>
+        <option value="overdue">معوق</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0;min-width:140px" id="shareTypeField">
+      <label>نوع سهم</label>
+      <select class="input" id="rShareType">
+        <option value="">همه</option>
+        <option value="full">تمام‌سهم</option>
+        <option value="half">نیم‌سهم</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0;min-width:130px">
+      <label>از تاریخ</label>
+      <input class="input" id="rDateFrom" placeholder="۱۴۰۳/۰۱/۰۱">
+    </div>
+    <div class="field" style="margin:0;min-width:130px">
+      <label>تا تاریخ</label>
+      <input class="input" id="rDateTo" placeholder="۱۴۰۳/۱۲/۲۹">
+    </div>
+    <div class="field" style="margin:0;min-width:160px">
+      <label>جستجو نام</label>
+      <input class="input" id="rName" placeholder="نام یا نام خانوادگی">
+    </div>
+    <button class="btn btn-navy" onclick="gen(this)">تولید گزارش</button>
+    <button class="btn btn-ghost" onclick="exportReport('xlsx')">📊 خروجی اکسل</button>
+    <button class="btn btn-ghost" onclick="exportReport('pdf')">📄 خروجی PDF</button>
+  </div>
+</div>
+<div id="out"></div>
+<style>@media print { .no-print { display:none!important } }</style>
+{% endblock %}
+{% block scripts %}
+<script>
+function fmtR(n){ return Number(n||0).toLocaleString(); }
+
+function onTypeChange(){
+  var t=document.getElementById('rType').value;
+  document.getElementById('statusField').style.display = t==='finance' ? '' : 'none';
+  document.getElementById('shareTypeField').style.display = t==='booklets' ? '' : 'none';
+}
+onTypeChange();
+
+fetch('/api/projects').then(function(r){return r.json();}).then(function(d){
+  var sel=document.getElementById('rProject');
+  d.projects.forEach(function(p){ sel.innerHTML+='<option value="'+p.id+'">'+p.name+'</option>'; });
+});
+
+function exportReport(fmt){
+  var type=document.getElementById('rType').value;
+  var pid=document.getElementById('rProject').value;
+  var status=document.getElementById('rStatus').value;
+  var shareType=document.getElementById('rShareType').value;
+  var dateFrom=document.getElementById('rDateFrom').value;
+  var dateTo=document.getElementById('rDateTo').value;
+  var name=document.getElementById('rName').value;
+
+  var params=new URLSearchParams();
+  params.append('type',type);
+  params.append('format',fmt);
+  if(pid) params.append('project_id',pid);
+  if(status) params.append('status',status);
+  if(shareType) params.append('share_type',shareType);
+  if(dateFrom) params.append('date_from',dateFrom);
+  if(dateTo) params.append('date_to',dateTo);
+  if(name) params.append('name',name);
+
+  window.location.href='/api/reports/export?'+params.toString();
+}
+
+function gen(btn){
+  var type=document.getElementById('rType').value;
+  var pid=document.getElementById('rProject').value;
+  var status=document.getElementById('rStatus').value;
+  var shareType=document.getElementById('rShareType').value;
+  var dateFrom=document.getElementById('rDateFrom').value;
+  var dateTo=document.getElementById('rDateTo').value;
+  var name=document.getElementById('rName').value;
+
+  btnLoading(btn,true);
+  var date=new Date().toLocaleDateString('fa-IR');
+  var hdr='<div style="font-size:18px;font-weight:800;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--border)">';
+  var out=document.getElementById('out');
+
+  if(type==='booklets'){
+    fetch('/api/reports?type=booklets').then(function(r){return r.json();}).then(function(d){
+      btnLoading(btn,false);
+      var items=d.booklets;
+      if(pid) items=items.filter(function(b){return String(b.project_id)===pid;});
+      if(shareType) items=items.filter(function(b){return b.share_type===shareType;});
+      if(name) items=items.filter(function(b){return (b.owner_name&&b.owner_name.includes(name))||(b.code&&b.code.includes(name));});
+      var rows=items.map(function(b){
+        return '<tr>'+
+          '<td class="mono">'+b.code+'</td>'+
+          '<td>'+(b.booklet_number||'—')+'</td>'+
+          '<td>'+b.project_name+'</td>'+
+          '<td>'+b.share_label+'</td>'+
+          '<td>'+(b.owner_name||'—')+'</td>'+
+          '<td>'+(b.contract_no||'—')+'</td>'+
+          '<td class="mono">'+fmtR(b.contract_amount)+'</td>'+
+          '<td class="mono">'+fmtR(b.debt)+'</td>'+
+          '<td>'+b.transfer_count+'</td>'+
+          '</tr>';
+      }).join('');
+      out.innerHTML=hdr+'گزارش دفترچه‌محور — '+date+'</div>'+
+        '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>'+
+        '<th>کد دفترچه</th><th>شماره دفترچه</th><th>پروژه</th><th>نوع سهم</th><th>مالک فعلی</th>'+
+        '<th>شماره قرارداد</th><th>مبلغ قرارداد (ریال)</th><th>بدهی (ریال)</th><th>تعداد انتقال</th>'+
+        '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    });
+    return;
+  }
+
+  if(type==='history'){
+    var params=new URLSearchParams();
+    if(pid) params.append('project_id',pid);
+    if(dateFrom) params.append('date_from',dateFrom);
+    if(dateTo) params.append('date_to',dateTo);
+    if(name) params.append('name',name);
+    fetch('/api/history?'+params.toString()).then(function(r){return r.json();}).then(function(d){
+      btnLoading(btn,false);
+      var rows=d.history.map(function(h){
+        return '<tr>'+
+          '<td>'+h.date.substring(0,10)+'</td>'+
+          '<td class="mono">'+h.booklet_code+'</td>'+
+          '<td>'+h.project_name+'</td>'+
+          '<td>'+h.from_name+'</td>'+
+          '<td>'+h.to_name+'</td>'+
+          '</tr>';
+      }).join('');
+      out.innerHTML=hdr+'تاریخچه انتقال — '+date+'</div>'+
+        '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>'+
+        '<th>تاریخ</th><th>دفترچه</th><th>پروژه</th><th>از</th><th>به</th>'+
+        '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    });
+    return;
+  }
+
+  fetch('/api/reports?type='+type).then(function(r){return r.json();}).then(function(d){
+    btnLoading(btn,false);
+    if(type==='finance'){
+      var payments=d.payments;
+      if(pid) payments=payments.filter(function(p){return p.booklet && p.booklet.project_name;});
+      if(status) payments=payments.filter(function(p){return p.status===status;});
+      if(name){var n=name.toLowerCase(); payments=payments.filter(function(p){return p.user&&p.user.full_name&&p.user.full_name.includes(name);});}
+      var rows=payments.map(function(p){
+        var cls=p.status==='paid'?'b-ok':p.status==='overdue'?'b-bad':'b-warn';
+        var lbl=p.status==='paid'?'پرداخت‌شده':p.status==='overdue'?'معوق':'در انتظار';
+        return '<tr>'+
+          '<td>'+(p.user?p.user.full_name:'—')+'</td>'+
+          '<td>'+(p.booklet?p.booklet.project_name:'—')+'</td>'+
+          '<td class="mono">'+(p.booklet?p.booklet.code:'—')+'</td>'+
+          '<td class="mono">'+fmtR(p.amount)+'</td>'+
+          '<td>'+p.due_date+'</td>'+
+          '<td><span class="badge '+cls+'">'+lbl+'</span></td>'+
+          '</tr>';
+      }).join('');
+      out.innerHTML=hdr+'گزارش مالی — '+date+'</div>'+
+        '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>'+
+        '<th>عضو</th><th>پروژه</th><th>دفترچه</th><th>مبلغ (ریال)</th><th>سررسید</th><th>وضعیت</th>'+
+        '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    } else {
+      var members=d.members;
+      if(pid) members=members.filter(function(m){return m.booklets&&m.booklets.some(function(b){return String(b.project_id)===pid;});});
+      if(name) members=members.filter(function(m){return (m.first_name+' '+m.last_name).includes(name);});
+      var rows2=members.map(function(m){
+        var bList=m.booklets?m.booklets.map(function(b){return (b.serial?'#'+b.serial+' ':'')+( b.booklet_number||b.code)+' ('+b.project_name+')';}).join(' | '):'—';
+        return '<tr>'+
+          '<td>'+(m.first_name||'')+'</td>'+
+          '<td><b>'+(m.last_name||'')+'</b></td>'+
+          '<td class="mono">'+(m.national_code||'—')+'</td>'+
+          '<td>'+(m.gender||'—')+'</td>'+
+          '<td>'+(m.phone||'—')+'</td>'+
+          '<td>'+bList+'</td>'+
+          '<td class="mono">'+(m.total_debt?fmtR(m.total_debt)+' ریال':'—')+'</td>'+
+          '</tr>';
+      }).join('');
+      out.innerHTML=hdr+'گزارش اعضا — '+date+'</div>'+
+        '<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>'+
+        '<th>نام</th><th>نام خانوادگی</th><th>کد ملی</th><th>جنسیت</th><th>موبایل</th><th>دفترچه‌ها</th><th>بدهی</th>'+
+        '</tr></thead><tbody>'+rows2+'</tbody></table></div></div>';
+    }
+  });
+}
+</script>
+{% endblock %}
