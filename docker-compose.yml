@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    container_name: tmdt-app
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: sqlite:////data/tmdt.db
+      BEHIND_PROXY: "1"
+      SESSION_COOKIE_SECURE: "0"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      SITE_TITLE: "سامانه مدیریت اعضا و امور مالی"
+    volumes:
+      - tmdt_data:/data
+      - tmdt_uploads:/app/static/uploads
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+
+volumes:
+  tmdt_data:
+  tmdt_uploads:
