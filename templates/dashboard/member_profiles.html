@@ -6,7 +6,7 @@
     <select class="input" id="projFilter" onchange="load()" style="max-width:200px">
       <option value="">همه پروژه‌ها</option>
     </select>
-    <input class="input" id="searchInp" placeholder="جستجو نام / کد ملی…" oninput="filterTable()" style="max-width:220px">
+    <input class="input" id="searchInp" placeholder="جستجو نام / کد ملی…" oninput="filterMembersTable()" style="max-width:220px">
   </div>
 </div>
 
@@ -51,7 +51,7 @@ function load() {
   });
 }
 
-function filterTable() {
+function filterMembersTable() {
   var q = document.getElementById('searchInp').value.toLowerCase();
   if (!q) { renderTable(allMembers); return; }
   renderTable(allMembers.filter(function(m) {
