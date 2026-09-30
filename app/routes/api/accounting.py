@@ -334,6 +334,14 @@ def vouchers_import_bank_statement():
     matched = unmatched = dup_count = zero_count = 0
 
     for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+        # صورت‌حساب‌های بانکی گاهی بعد از آخرین تراکنش، چند ردیف خالی و بعد یک
+        # جدول خلاصه/گزارش کلی (با اعداد نامرتبط در همان ستون‌ها) دارند —
+        # تراکنش واقعی هرگز ردیف کاملاً خالی میانش ندارد، پس با رسیدن به اولین
+        # ردیف خالی متوقف می‌شویم، نه فقط رد کردنش، وگرنه ردیف‌های خلاصه‌ی بعدی
+        # به‌عنوان واریزی ساختگی با مبالغ نجومی وارد می‌شوند.
+        if not row or not any(row):
+            break
+
         amount = cell_amount(g(row, "deposit_amount"))
         if amount <= 0:
             zero_count += 1
