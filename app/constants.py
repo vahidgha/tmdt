@@ -12,7 +12,14 @@ class ExpenseCategory:
     CONTRACTOR = "contractor"  # پیمانکار
     ADMIN      = "admin"       # اداری
     UTILITY    = "utility"     # خدمات/تأسیسات
+    BANK_FEE   = "bank_fee"    # کارمزد بانکی
     OTHER      = "other"
+
+
+class DepositCategory:
+    MEMBER_DEPOSIT = "member_deposit"  # واریزی عضو
+    BANK_INTEREST  = "bank_interest"   # سود بانکی
+    OTHER          = "other"
 
 
 class BookletShareType:

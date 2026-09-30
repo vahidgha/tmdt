@@ -461,6 +461,9 @@ class DepositVoucher(Base):
     channel             = Column(String(20), default="")        # TELLER, ATM, ...
     bank_balance_after  = Column(BigInteger, nullable=True)      # مانده حساب بلافاصله پس از این تراکنش (طبق صورت‌حساب بانک)
 
+    # کدینگ نوع واریزی — برای تفکیک در جستجو/گزارش‌ها
+    category = Column(String(20), default="member_deposit")  # member_deposit | bank_interest | other
+
     user    = relationship("User",        foreign_keys=[user_id])
     account = relationship("CoopAccount", foreign_keys=[account_id])
     creator = relationship("User",        foreign_keys=[created_by])
@@ -486,6 +489,7 @@ class DepositVoucher(Base):
             "source": self.source or "manual",
             "branch_code": self.branch_code or "", "branch_name": self.branch_name or "",
             "channel": self.channel or "", "bank_balance_after": self.bank_balance_after,
+            "category": self.category or "member_deposit",
             "matched": bool(self.user_id),
         }
 

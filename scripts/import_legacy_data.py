@@ -93,6 +93,7 @@ def _iter_statement1_rows(ws):
             "date": cell_str(_cell(row, 2)).strip(),
             "time": cell_str(_cell(row, 3)).strip(),
             "deposit_amount": cell_amount(_cell(row, 4)),
+            "withdrawal_amount": cell_amount(_cell(row, 5)),
             "balance": cell_amount(_cell(row, 6)) or None,
             "branch_code": cell_str(_cell(row, 7)),
             "branch_name": cell_str(_cell(row, 8)),
@@ -160,7 +161,16 @@ def import_members(wb, statement1_sheet="صورتحساب1"):
         if existing:
             existing.personnel_code = existing.personnel_code or personnel_code
             existing.national_code = existing.national_code or (national_code or None)
-            existing.deposit_id = existing.deposit_id or (deposit_id or None)
+            # همان بررسی برخورد شناسه واریز که برای عضو تازه انجام می‌شود، باید
+            # برای به‌روزرسانی عضو موجود هم انجام شود — وگرنه در اجرای دوم اسکریپت
+            # (که این عضو دیگر «تازه» نیست، از قبل موجود است) روی UNIQUE قدیمی
+            # کرش می‌کند، چون deposit_id از داده منبع هر بار همان مقدار تکراری است.
+            if not existing.deposit_id and deposit_id:
+                if deposit_id in claimed_deposit_ids:
+                    dep_collisions.append((personnel_code, deposit_id))
+                else:
+                    existing.deposit_id = deposit_id
+                    claimed_deposit_ids.add(deposit_id)
             existing.org_unit = existing.org_unit or (org_unit or None)
             existing.phone = existing.phone or (phone or None)
             updated += 1
@@ -267,6 +277,7 @@ def import_deposits(wb, account, statement1_sheet="صورتحساب1"):
         existing_keys.add(key)
 
         user = users_by_personnel.get(r["personnel_code"]) or dep_map.get(r["deposit_id"])
+        category = "bank_interest" if "سود" in desc_raw else "member_deposit"
 
         last_no += 1
         db_session.add(DepositVoucher(
@@ -285,6 +296,7 @@ def import_deposits(wb, account, statement1_sheet="صورتحساب1"):
             branch_name=r["branch_name"],
             channel=r["channel"],
             bank_balance_after=r["balance"],
+            category=category,
         ))
         if user:
             matched += 1
@@ -293,6 +305,48 @@ def import_deposits(wb, account, statement1_sheet="صورتحساب1"):
 
     db_session.commit()
     return matched, unmatched, dup, zero
+
+
+def import_bank_fees(wb, account, statement1_sheet="صورتحساب1"):
+    """
+    ردیف‌های برداشتی «کارمزد» (کارمزد تراکنش/دسته چک و غیره) شیت «صورتحساب۱» را
+    به‌عنوان سند هزینه با کدینگ bank_fee ثبت می‌کند — این ردیف‌ها چون در ستون
+    «مبلغ واریز» صفر هستند، در import_deposits نادیده گرفته می‌شوند.
+    """
+    if statement1_sheet not in wb.sheetnames:
+        return 0
+    ws = wb[statement1_sheet]
+
+    last_no = db_session.query(func.max(ExpenseVoucher.number)).scalar() or 1000
+    existing_keys = set(
+        db_session.query(ExpenseVoucher.reference_no, ExpenseVoucher.spend_date, ExpenseVoucher.amount)
+        .filter_by(account_id=account.id, category="bank_fee").all()
+    )
+    created = 0
+
+    for r in _iter_statement1_rows(ws):
+        withdrawal = r["withdrawal_amount"]
+        if withdrawal <= 0:
+            continue
+        desc_raw = " ".join(filter(None, [r["tx_type"], *r["desc_cols"]]))
+        if "کارمزد" not in desc_raw and "كارمزد" not in desc_raw:
+            continue
+
+        key = (r["reference_no"], r["date"], withdrawal)
+        if key in existing_keys:
+            continue
+        existing_keys.add(key)
+
+        last_no += 1
+        db_session.add(ExpenseVoucher(
+            number=last_no, account_id=account.id, category="bank_fee",
+            payee="بانک", amount=withdrawal, spend_date=r["date"],
+            method="other", reference_no=r["reference_no"], description=desc_raw or None,
+        ))
+        created += 1
+
+    db_session.commit()
+    return created
 
 
 def import_expenses(wb, account, sheet_name="پرداختی"):
@@ -359,6 +413,10 @@ def main():
         print(f"\U0001F4E5 درون‌ریزی واریزی‌ها (حساب: {account.holder_name})...")
         matched, unmatched, dup, zero = import_deposits(wb, account)
         print(f"  تطبیق‌یافته: {matched} — بدون تطبیق: {unmatched} — تکراری نادیده‌گرفته‌شده: {dup} — ردیف صفر/برداشت: {zero}")
+
+        print("\U0001F4E5 درون‌ریزی کارمزدهای بانکی...")
+        fee_created = import_bank_fees(wb, account)
+        print(f"  سند کارمزد جدید: {fee_created}")
 
         print("\U0001F4E5 درون‌ریزی پرداخت‌های پیمانکار...")
         exp_created = import_expenses(wb, account)

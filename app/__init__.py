@@ -375,6 +375,7 @@ def _migrate(engine):
         _add('deposit_vouchers', 'branch_name',        "VARCHAR(80) DEFAULT ''")
         _add('deposit_vouchers', 'channel',            "VARCHAR(20) DEFAULT ''")
         _add('deposit_vouchers', 'bank_balance_after', 'BIGINT')
+        _add('deposit_vouchers', 'category',           "VARCHAR(20) DEFAULT 'member_deposit'")
         _add('booklets', 'serial',           'INTEGER')
         _add('booklets', 'booklet_number',   "VARCHAR(30) DEFAULT ''")
         _add('booklets', 'contract_no',      "VARCHAR(80) DEFAULT ''")

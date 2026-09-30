@@ -51,6 +51,10 @@
       <select class="input" id="fStatus" onchange="goPage(1)" style="max-width:120px">
         <option value="">همه اسناد</option><option value="active">فعال</option><option value="voided">ابطال‌شده</option>
       </select>
+      <select class="input" id="fCategory" onchange="goPage(1)" style="max-width:150px">
+        <option value="">همه کدینگ‌ها</option><option value="member_deposit">واریزی عضو</option>
+        <option value="bank_interest">سود بانکی</option><option value="other">سایر</option>
+      </select>
       <input class="input" id="fFrom" placeholder="از 1404/01/01" style="max-width:140px" onchange="goPage(1)">
       <input class="input" id="fTo" placeholder="تا" style="max-width:120px" onchange="goPage(1)">
       <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;white-space:nowrap">
@@ -63,7 +67,7 @@
       <a class="btn-outline btn-sm" href="/api/accounting/vouchers/export?format=pdf" download>📄 خروجی PDF</a>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>سند</th><th>واریزکننده</th><th>حساب</th><th>مبلغ</th><th>تخصیص</th><th>تاریخ/ساعت</th><th>روش</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+      <thead><tr><th>سند</th><th>واریزکننده</th><th>حساب</th><th>مبلغ</th><th>کدینگ</th><th>تخصیص</th><th>تاریخ/ساعت</th><th>روش</th><th>وضعیت</th><th>عملیات</th></tr></thead>
       <tbody id="vTbody"></tbody>
     </table></div>
     <div id="pgBar" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid var(--border)"></div>
@@ -77,7 +81,7 @@
       <input class="input" id="eSearch" placeholder="جستجو دریافت‌کننده…" oninput="expSearchChanged()" style="flex:1;min-width:160px">
       <select class="input" id="eCat" onchange="loadExpenses()" style="max-width:150px">
         <option value="">همه دسته‌ها</option><option value="land">خرید زمین</option><option value="contractor">پیمانکار</option>
-        <option value="admin">اداری</option><option value="utility">خدمات</option><option value="other">سایر</option>
+        <option value="admin">اداری</option><option value="utility">خدمات</option><option value="bank_fee">کارمزد بانکی</option><option value="other">سایر</option>
       </select>
       <select class="input" id="eStatus" onchange="loadExpenses()" style="max-width:120px">
         <option value="">همه</option><option value="active">فعال</option><option value="voided">ابطال‌شده</option>
@@ -178,7 +182,8 @@
       <div class="field"><label>دریافت‌کننده (بابت) *</label><input class="input" id="ePayee" placeholder="پیمانکار / فروشنده"></div>
       <div class="field"><label>دسته</label><select class="input" id="eCategory">
         <option value="land">خرید زمین</option><option value="contractor">پیمانکار</option>
-        <option value="admin">اداری</option><option value="utility">خدمات/تأسیسات</option><option value="other" selected>سایر</option></select></div>
+        <option value="admin">اداری</option><option value="utility">خدمات/تأسیسات</option>
+        <option value="bank_fee">کارمزد بانکی</option><option value="other" selected>سایر</option></select></div>
       <div class="field"><label>پروژه (اختیاری)</label><select class="input" id="eProject"><option value="">— عمومی —</option></select></div>
       <div class="field"><label>مبلغ (ریال) *</label><input class="input mono" id="eAmount" inputmode="numeric" oninput="fmtAmt(this)"></div>
       <div class="field"><label>تاریخ *</label><input class="input" id="eDate" data-jdp placeholder="1404/05/01"></div>
@@ -247,7 +252,8 @@
 <script>
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 var methodLabel={card:'کارت به کارت',transfer:'انتقال بانکی',cash:'نقدی',cheque:'چک',other:'سایر'};
-var catLabel={land:'خرید زمین',contractor:'پیمانکار',admin:'اداری',utility:'خدمات',other:'سایر'};
+var catLabel={land:'خرید زمین',contractor:'پیمانکار',admin:'اداری',utility:'خدمات',bank_fee:'کارمزد بانکی',other:'سایر'};
+var depCatLabel={member_deposit:'واریزی عضو',bank_interest:'سود بانکی',other:'سایر'};
 var accounts=[], projects=[], curPage=1, searchTimer=null, expTimer=null, voidCtx=null, allocVoucher=null;
 
 function skeletonRows(cols, n){
@@ -336,6 +342,7 @@ function submitBankImport(btn){
       btnLoading(btn,false);
       if(!x.ok){err.textContent=x.d.error||'خطا در وارد کردن فایل';err.style.display='';return;}
       res.innerHTML='<b>'+x.d.matched+'</b> واریزی تطبیق‌یافته، <b>'+x.d.unmatched+'</b> بدون تطبیق، '+
+        '<b>'+(x.d.bank_fees||0)+'</b> کارمزد بانکی، '+
         x.d.skipped_duplicate+' تکراری نادیده‌گرفته‌شد.';
       res.style.display='';
       toast('صورت‌حساب وارد شد');
@@ -360,16 +367,17 @@ function openNewVoucher(){if(!accounts.filter(function(a){return a.active;}).len
 function submitVoucher(btn){var err=document.getElementById('vErr');err.style.display='none';var fd=new FormData();fd.append('account_id',$v('vAccount'));fd.append('amount',rawAmt('vAmount'));fd.append('deposit_date',$v('vDate'));fd.append('deposit_time',$v('vTime'));fd.append('method',$v('vMethod'));fd.append('reference_no',$v('vRef'));fd.append('description',$v('vDesc'));var uid=$v('vUser');if(uid)fd.append('user_id',uid);else fd.append('payer_name',$v('vPayer'));var f=document.getElementById('vReceipt').files[0];if(f)fd.append('receipt',f);btnLoading(btn,true);
   fetch('/api/accounting/vouchers',{method:'POST',body:fd}).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});}).then(function(x){btnLoading(btn,false);if(x.ok){modal.close('voucherModal');toast('سند #'+x.d.voucher.number+' ثبت شد');loadVouchers();loadDashboard();}else{err.textContent=x.d.error||'خطا';err.style.display='';}}).catch(function(){btnLoading(btn,false);err.textContent='خطا در سرور';err.style.display='';});}
 
-function loadVouchers(){var p=new URLSearchParams({page:curPage,per_page:30});var s=$v('fSearch');if(s)p.set('search',s);var a=$v('fAccount');if(a)p.set('account_id',a);var st=$v('fStatus');if(st)p.set('status',st);var df=$v('fFrom');if(df)p.set('date_from',df);var dt=$v('fTo');if(dt)p.set('date_to',dt);if(document.getElementById('fUnmatched').checked)p.set('unmatched','1');
-  document.getElementById('vTbody').innerHTML=skeletonRows(9);
+function loadVouchers(){var p=new URLSearchParams({page:curPage,per_page:30});var s=$v('fSearch');if(s)p.set('search',s);var a=$v('fAccount');if(a)p.set('account_id',a);var st=$v('fStatus');if(st)p.set('status',st);var cat=$v('fCategory');if(cat)p.set('category',cat);var df=$v('fFrom');if(df)p.set('date_from',df);var dt=$v('fTo');if(dt)p.set('date_to',dt);if(document.getElementById('fUnmatched').checked)p.set('unmatched','1');
+  document.getElementById('vTbody').innerHTML=skeletonRows(10);
   fetch('/api/accounting/vouchers?'+p).then(function(r){return r.json();}).then(function(d){
     document.getElementById('totalsBar').innerHTML='<b>'+d.total+'</b> سند — جمع فعال: <b style="color:var(--navy)">'+fmt(d.total_amount)+' ریال</b>';
     var tb=document.getElementById('vTbody');
-    if(!d.vouchers.length){tb.innerHTML='<tr><td colspan="9"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>سندی یافت نشد</div></td></tr>';}
+    if(!d.vouchers.length){tb.innerHTML='<tr><td colspan="10"><div class="empty" style="padding:24px"><div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>سندی یافت نشد</div></td></tr>';}
     else tb.innerHTML=d.vouchers.map(function(v){var voided=v.status==='voided';
       return '<tr style="'+(voided?'opacity:.5':'')+'">'+
         '<td class="mono"><b>#'+v.number+'</b></td><td>'+esc(v.payer_name)+(v.source==='bank_import'&&!v.matched?' <span class="badge b-warn" title="از صورت‌حساب بانکی وارد شده و به هیچ عضوی تطبیق نیافته">بدون تطبیق</span>':'')+'</td>'+
         '<td style="font-size:12px">'+v.account_label+'</td><td class="mono"><b>'+fmt(v.amount)+'</b></td>'+
+        '<td>'+(v.category==='bank_interest'?'<span class="badge b-ok">سود بانکی</span>':(depCatLabel[v.category]||v.category||'—'))+'</td>'+
         '<td>'+(v.user_id&&!voided?'<button class="btn-outline btn-sm" onclick="openAlloc('+v.id+')">تخصیص</button>':'—')+'</td>'+
         '<td class="mono" style="font-size:12px">'+v.deposit_date+(v.deposit_time?' — '+v.deposit_time:'')+'</td>'+
         '<td style="font-size:12px">'+(methodLabel[v.method]||v.method)+'</td>'+

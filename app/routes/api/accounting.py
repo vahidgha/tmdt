@@ -25,7 +25,8 @@ from ...utils.validation import normalize_digits
 bp = Blueprint("accounting", __name__)
 
 VOUCHER_METHODS  = ("card", "transfer", "cash", "cheque", "other")
-EXPENSE_CATS     = ("land", "contractor", "admin", "utility", "other")
+EXPENSE_CATS     = ("land", "contractor", "admin", "utility", "bank_fee", "other")
+DEPOSIT_CATS     = ("member_deposit", "bank_interest", "other")
 
 
 # ── کمک‌تابع‌های تخصیص/تسویه ─────────────────────────────────────────────────
@@ -146,6 +147,7 @@ def vouchers_list():
     date_to    = (request.args.get("date_to") or "").strip()
     search     = (request.args.get("search") or "").strip()
     unmatched  = request.args.get("unmatched") == "1"
+    category   = (request.args.get("category") or "").strip()
     page       = request.args.get("page", 1, type=int)
     per_page   = min(request.args.get("per_page", 30, type=int) or 30, 200)
 
@@ -153,6 +155,8 @@ def vouchers_list():
     if user_id and is_finance:
         q = q.filter(DepositVoucher.user_id == user_id)
     if status:     q = q.filter(DepositVoucher.status == status)
+    if category and category in DEPOSIT_CATS:
+        q = q.filter(DepositVoucher.category == category)
     if unmatched and is_finance:
         q = q.filter(DepositVoucher.user_id.is_(None), DepositVoucher.source == "bank_import")
     if date_from:  q = q.filter(DepositVoucher.deposit_date >= date_from)
@@ -216,6 +220,10 @@ def vouchers_create():
     if method not in VOUCHER_METHODS:
         method = "other"
 
+    category = data.get("category", "member_deposit")
+    if category not in DEPOSIT_CATS:
+        category = "member_deposit"
+
     receipt_path = None
     f = request.files.get("receipt")
     if f and f.filename:
@@ -238,6 +246,7 @@ def vouchers_create():
         description=data.get("description") or None,
         receipt_path=receipt_path,
         payment_id=parse_int(data.get("payment_id")) or None,
+        category=category,
         created_by=current_user.id,
     )
     db_session.add(v)
@@ -331,7 +340,8 @@ def vouchers_import_bank_statement():
         return row[i] if i is not None and i < len(row) else None
 
     last_no = db_session.query(func.max(DepositVoucher.number)).scalar() or 1000
-    matched = unmatched = dup_count = zero_count = 0
+    last_exp_no = db_session.query(func.max(ExpenseVoucher.number)).scalar() or 1000
+    matched = unmatched = dup_count = zero_count = fee_count = 0
 
     for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
         # صورت‌حساب‌های بانکی گاهی بعد از آخرین تراکنش، چند ردیف خالی و بعد یک
@@ -341,11 +351,6 @@ def vouchers_import_bank_statement():
         # به‌عنوان واریزی ساختگی با مبالغ نجومی وارد می‌شوند.
         if not row or not any(row):
             break
-
-        amount = cell_amount(g(row, "deposit_amount"))
-        if amount <= 0:
-            zero_count += 1
-            continue
 
         deposit_date = normalize_digits(cell_str(g(row, "date")).strip())
         deposit_time = normalize_digits(cell_str(g(row, "time")).strip())
@@ -357,6 +362,32 @@ def vouchers_import_bank_statement():
         desc_raw     = " ".join(filter(None, (
             cell_str(row[i]) for i in col_idx["desc_cols"] if i < len(row)
         )))
+
+        amount = cell_amount(g(row, "deposit_amount"))
+        if amount <= 0:
+            # ردیف واریزی نیست — اگر کارمزد بانکی باشد (برداشت کوچک، به‌جای
+            # نادیده‌گرفتن) به‌عنوان سند هزینه با کدینگ «کارمزد بانکی» ثبت می‌شود
+            # تا در گزارش‌ها از هزینه‌های دیگر تفکیک شود.
+            withdrawal = cell_amount(g(row, "withdrawal_amount"))
+            if withdrawal > 0 and ("کارمزد" in desc_raw or "كارمزد" in desc_raw):
+                dup = db_session.query(ExpenseVoucher).filter_by(
+                    account_id=account.id, reference_no=reference_no,
+                    spend_date=deposit_date, amount=withdrawal,
+                ).first()
+                if dup:
+                    dup_count += 1
+                else:
+                    last_exp_no += 1
+                    db_session.add(ExpenseVoucher(
+                        number=last_exp_no, account_id=account.id, category="bank_fee",
+                        payee="بانک", amount=withdrawal, spend_date=deposit_date,
+                        method="other", reference_no=reference_no,
+                        description=desc_raw or None, created_by=current_user.id,
+                    ))
+                    fee_count += 1
+            else:
+                zero_count += 1
+            continue
 
         dup = db_session.query(DepositVoucher).filter_by(
             account_id=account.id, reference_no=reference_no,
@@ -371,6 +402,8 @@ def vouchers_import_bank_statement():
             user = dep_map.get(cand)
             if user:
                 break
+
+        category = "bank_interest" if "سود" in desc_raw else "member_deposit"
 
         last_no += 1
         v = DepositVoucher(
@@ -389,6 +422,7 @@ def vouchers_import_bank_statement():
             branch_name=branch_name,
             channel=channel,
             bank_balance_after=balance,
+            category=category,
             created_by=current_user.id,
         )
         db_session.add(v)
@@ -401,10 +435,10 @@ def vouchers_import_bank_statement():
     log_activity(
         "voucher_bank_import",
         f"واردات صورت‌حساب بانکی حساب {account.holder_name}: "
-        f"{matched} واریزی تطبیق‌یافته، {unmatched} بدون تطبیق، {dup_count} تکراری نادیده‌گرفته‌شده",
+        f"{matched} واریزی تطبیق‌یافته، {unmatched} بدون تطبیق، {fee_count} کارمزد، {dup_count} تکراری نادیده‌گرفته‌شده",
         "finance",
     )
-    return jsonify(ok=True, matched=matched, unmatched=unmatched,
+    return jsonify(ok=True, matched=matched, unmatched=unmatched, bank_fees=fee_count,
                    skipped_duplicate=dup_count, skipped_zero=zero_count), 201
 
 
@@ -971,20 +1005,25 @@ def vouchers_export():
     q = db_session.query(DepositVoucher)
     account_id = request.args.get("account_id", type=int)
     status     = (request.args.get("status") or "").strip()
+    category   = (request.args.get("category") or "").strip()
     if account_id: q = q.filter(DepositVoucher.account_id == account_id)
     if status:     q = q.filter(DepositVoucher.status == status)
+    if category and category in DEPOSIT_CATS:
+        q = q.filter(DepositVoucher.category == category)
     vs = q.order_by(DepositVoucher.number).all()
     method_lbl = {"card": "کارت", "transfer": "انتقال", "cash": "نقدی", "cheque": "چک", "other": "سایر"}
+    cat_lbl    = {"member_deposit": "واریزی عضو", "bank_interest": "سود بانکی", "other": "سایر"}
     rows = [[
         v.number, v.to_dict()["payer_name"],
         v.account.holder_name if v.account else "",
         v.amount, v.deposit_date, v.deposit_time or "",
-        method_lbl.get(v.method, v.method), v.reference_no or "",
+        method_lbl.get(v.method, v.method), cat_lbl.get(v.category, v.category),
+        v.reference_no or "",
         "ابطال" if v.status == "voided" else "فعال",
         v.description or "",
     ] for v in vs]
     headers = ["شماره سند", "واریزکننده", "حساب مقصد", "مبلغ (ریال)", "تاریخ", "ساعت",
-               "روش", "شماره پیگیری", "وضعیت", "شرح"]
+               "روش", "کدینگ", "شماره پیگیری", "وضعیت", "شرح"]
     fmt = (request.args.get("format") or "xlsx").strip()
     if fmt == "pdf":
         return export_pdf(headers, rows, "اسناد واریز", "deposit_vouchers.pdf")
@@ -997,7 +1036,7 @@ def expenses_export():
     err = require_finance()
     if err: return err
     cat_lbl = {"land": "خرید زمین", "contractor": "پیمانکار", "admin": "اداری",
-               "utility": "خدمات", "other": "سایر"}
+               "utility": "خدمات", "bank_fee": "کارمزد بانکی", "other": "سایر"}
     es = db_session.query(ExpenseVoucher).order_by(ExpenseVoucher.number).all()
     rows = [[
         e.number, e.payee, cat_lbl.get(e.category, e.category),
